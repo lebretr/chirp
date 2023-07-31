@@ -14,15 +14,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
-import os
 import logging
 
 from chirp.drivers import yaesu_clone
 from chirp import chirp_common, memmap, bitwise, directory, errors
 from chirp.settings import RadioSetting, RadioSettingGroup, \
-    RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, RadioSettings
+    RadioSettingValueList, RadioSettingValueString, \
+    RadioSettings
 
 LOG = logging.getLogger(__name__)
 
@@ -506,13 +504,13 @@ class FT60Radio(yaesu_clone.YaesuCloneModeRadio):
                                                         _settings.dcs_nr])))
 
         # DT.DLY
-        opts = ["50 MS", "100 MS", "250 MS", "450 MS", "750 MS", "1000 MS"]
+        opts = ["50 ms", "100 ms", "250 ms", "450 ms", "750 ms", "1000 ms"]
         ctcss.append(RadioSetting("dt_dly", "DTMF Autodialer Delay Time",
                                   RadioSettingValueList(opts, opts[
                                                         _settings.dt_dly])))
 
         # DT.SPD
-        opts = ["50 MS", "100 MS"]
+        opts = ["50 ms", "100 ms"]
         ctcss.append(RadioSetting("dt_spd", "DTMF Autodialer Sending Speed",
                                   RadioSettingValueList(opts, opts[
                                                         _settings.dt_spd])))
@@ -627,7 +625,7 @@ class FT60Radio(yaesu_clone.YaesuCloneModeRadio):
                                                        _settings.pri_rvt])))
 
         # RXSAVE
-        opts = ["OFF", "200 MS", "300 MS", "500 MS", "1 S", "2 S"]
+        opts = ["OFF", "200 ms", "300 ms", "500 ms", "1 s", "2 s"]
         power.append(RadioSetting(
             "rxsave", "Receive Mode Battery Savery Interval",
                      RadioSettingValueList(opts, opts[_settings.rxsave])))
@@ -718,7 +716,7 @@ class FT60Radio(yaesu_clone.YaesuCloneModeRadio):
                     setattr(_settings, name, value)
 
                 LOG.debug("Setting %s: %s" % (name, value))
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 
@@ -796,7 +794,7 @@ class FT60Radio(yaesu_clone.YaesuCloneModeRadio):
             _nam = self._memobj.names[mem.number - 1]
             _skp = self._memobj.flags[(mem.number - 1) / 4]
 
-        assert(_mem)
+        assert (_mem)
         if mem.empty:
             _mem.used = False
             return

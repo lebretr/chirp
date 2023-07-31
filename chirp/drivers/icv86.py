@@ -16,11 +16,10 @@
 import logging
 
 from chirp.drivers import icf
-from chirp import chirp_common, memmap, bitwise, errors, directory
+from chirp import chirp_common, bitwise, errors, directory
 from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, RadioSettings
+    RadioSettingValueBoolean, RadioSettings
 
 LOG = logging.getLogger(__name__)
 
@@ -103,7 +102,8 @@ TUNING_STEPS = [5., 10., 12.5, 15., 20., 25., 30., 50.]
 POWER_LEVELS = [
     chirp_common.PowerLevel("High", watts=5.5),
     chirp_common.PowerLevel("Low", watts=0.5),
-    chirp_common.PowerLevel("Mid", watts=2.5)
+    chirp_common.PowerLevel("Mid", watts=2.5),
+    chirp_common.PowerLevel("Extra High", watts=7.0),
 ]
 
 
@@ -151,7 +151,6 @@ class ICV86Radio(icf.IcomCloneModeRadio):
     def process_mmap(self):
         self._memobj = bitwise.parse(ICV86_MEM_FORMAT, self._mmap)
 
-
     def get_settings(self):
         _settings = self._memobj.settings
 
@@ -168,7 +167,8 @@ class ICV86Radio(icf.IcomCloneModeRadio):
 
         # Mic Gain
         rs = RadioSetting("mic", "Mic Gain",
-                RadioSettingValueInteger(1, 4, _settings.mic + 1))
+                          RadioSettingValueInteger(1, 4, _settings.mic + 1))
+
         def apply_mic(s, obj):
             setattr(obj, s.get_name(), int(s.value) - 1)
         rs.set_apply_callback(apply_mic, self._memobj.settings)
@@ -207,7 +207,7 @@ class ICV86Radio(icf.IcomCloneModeRadio):
                     setting = element.get_name()
                     LOG.debug("Setting %s = %s" % (setting, element.value))
                     setattr(_settings, setting, element.value)
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 
@@ -250,12 +250,12 @@ class ICV86Radio(icf.IcomCloneModeRadio):
         # Extras
         mem.extra = RadioSettingGroup("extra", "Extra")
         rev = RadioSetting("rev", "Reverse duplex",
-                    RadioSettingValueBoolean(bool(_mem.rev)))
+                           RadioSettingValueBoolean(bool(_mem.rev)))
         rev.set_doc("Reverse duplex")
         mem.extra.append(rev)
-        
+
         tx = RadioSetting("tx", "Tx permission",
-                    RadioSettingValueBoolean(bool(_mem.tx)))
+                          RadioSettingValueBoolean(bool(_mem.tx)))
         tx.set_doc("Tx permission")
         mem.extra.append(tx)
 
@@ -268,7 +268,7 @@ class ICV86Radio(icf.IcomCloneModeRadio):
         if not self._mmap:
             self.sync_in()
 
-        assert(self._mmap)
+        assert (self._mmap)
 
         if isinstance(number, str):
             try:
@@ -281,12 +281,12 @@ class ICV86Radio(icf.IcomCloneModeRadio):
     def _fill_memory(self, number):
         _mem = self._memobj.memory[number]
 
-        assert(_mem)
+        assert (_mem)
 
         # zero-fill
         _mem.freq = 146010000
         _mem.offset = 146010000
-        _mem.name =  str("").ljust(5)
+        _mem.name = str("").ljust(5)
         _mem.reserved1 = 0x0
         _mem.rtone = 0x8
         _mem.reserved2 = 0x0
@@ -306,7 +306,7 @@ class ICV86Radio(icf.IcomCloneModeRadio):
         _mem.tx = 0x1
         _mem.reserved8 = 0x0
         _mem.power = 0x0
-        _mem.reserved9 = 0x0 
+        _mem.reserved9 = 0x0
         _mem.reserved10 = 0x0
         _mem.reserved11 = 0x0
         _mem.reserved12 = 0x0
@@ -319,7 +319,7 @@ class ICV86Radio(icf.IcomCloneModeRadio):
         _usd = self._memobj.used[byte] if mem.number <= 206 else None
         _skp = self._memobj.skips[byte] if mem.number < 200 else None
 
-        assert(_mem)
+        assert (_mem)
 
         if mem.empty:
             self._fill_memory(mem.number)
@@ -359,11 +359,10 @@ class ICV86Radio(icf.IcomCloneModeRadio):
         if not self._mmap:
             self.sync_in()
 
-        assert(self._mmap)
+        assert (self._mmap)
 
         return self._set_memory(mem)
 
     def get_raw_memory(self, number):
         return repr(self._memobj.memory[number]) + \
-            repr(self._memobj.flags[(number)])
-
+            repr(self._memobj.used[(number)])

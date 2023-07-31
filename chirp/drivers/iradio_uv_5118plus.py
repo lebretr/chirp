@@ -39,7 +39,7 @@ struct memory {
      lowpower:1,    // Power
      scan:1,        // Scan Add
      bcl:2,         // Busy Lock
-     unknown_2:1,   //
+     is_airband:1,  // Air Band (AM)
      unknown_3:1,   //
      unknown_4:1;   //
   u8 unknown_5;     //                       01
@@ -208,7 +208,7 @@ def _enter_programming_mode(radio):
             if ack == CMD_ACK:
                 exito = True
                 break
-        except errors.RadioError:
+        except Exception:
             LOG.debug("Attempt #%s, failed, trying again" % i)
             pass
 
@@ -223,7 +223,7 @@ def _exit_programming_mode(radio):
     serial = radio.pipe
     try:
         serial.write(b"58" + b"\x05\xEE\x60")
-    except errors.RadioError:
+    except Exception:
         raise errors.RadioError("Radio refused to exit programming mode")
 
 
@@ -255,7 +255,7 @@ def _read_block(radio, block_addr, block_size):
             raise Exception("Block failed checksum!")
 
         block_data = chunk[:-1]
-    except errors.RadioError:
+    except Exception:
         raise errors.RadioError("Failed to read block at %04x" % block_addr)
 
     return block_data
@@ -282,7 +282,7 @@ def _write_block(radio, block_addr, block_size):
         serial.write(cmd + data)
         if serial.read(1) != CMD_ACK:
             raise Exception("No ACK")
-    except errors.RadioError:
+    except Exception:
         raise errors.RadioError("Failed to send block "
                                 "to radio at %04x" % block_addr)
 
@@ -323,7 +323,7 @@ def do_upload(radio):
     status.cur = 0
     status.max = radio._memsize
 
-    # The OEM software reads the 1st block from the radio before comencing
+    # The OEM software reads the 1st block from the radio before commencing
     # with the upload. That behavior will be mirrored here.
     _read_block(radio, radio.START_ADDR, radio.BLOCK_SIZE)
 
@@ -521,9 +521,14 @@ class IradioUV5118plus(chirp_common.CloneModeRadio):
         else:
             mem.offset = 0
 
-        mem.name = str(_mem.name).rstrip('\xFF ')
+        mem.name = str(_mem.name).rstrip(" ").replace("\xFF", " ")
 
         mem.mode = _mem.isnarrow and "NFM" or "FM"
+
+        if mem.freq < 136000000:
+            _mem.is_airband = True
+        else:
+            _mem.is_airband = False
 
         chirp_common.split_tone_decode(mem,
                                        self._decode_tone(_mem.tx_tone),
@@ -558,9 +563,9 @@ class IradioUV5118plus(chirp_common.CloneModeRadio):
         LOG.debug("Setting %i(%s)" % (mem.number, mem.extd_number))
         _mem = self._memobj.channels[mem.number - 1]
 
-        # if empty memmory
+        # if empty memory
         if mem.empty:
-            _mem.set_raw("\xFF" * 22 + "\20" * 10)
+            _mem.set_raw("\xFF" * 22 + "\x20" * 10)
             return
 
         _mem.set_raw("\xFF" * 4 + "\x00\x30" + "\xFF" * 4 + "\x00\x30" +
@@ -577,7 +582,7 @@ class IradioUV5118plus(chirp_common.CloneModeRadio):
         else:
             _mem.txfreq = mem.freq / 10
 
-        _mem.name = mem.name.rstrip(' ').ljust(10, '\xFF')
+        _mem.name = mem.name.rstrip('\xFF').ljust(10, '\x20')
 
         _mem.scan = mem.skip != "S"
         _mem.isnarrow = mem.mode == "NFM"

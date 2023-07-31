@@ -15,15 +15,13 @@
 
 import time
 import logging
-import os
 import re
 
 from chirp.drivers import yaesu_clone
 from chirp import chirp_common, memmap, directory, bitwise, errors
 from chirp.settings import RadioSetting, RadioSettingGroup, \
-    RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettings
+    RadioSettingValueList, RadioSettingValueBoolean, \
+    RadioSettingValueString, RadioSettings
 
 from collections import defaultdict
 
@@ -494,9 +492,8 @@ class FT7800BankModel(chirp_common.BankModel):
         _bitmap = self._radio._memobj.bank_channels[bank.index]
         ishft = 31 - (index % 32)
         if not (_bitmap.bitmap[index // 32] & (1 << ishft)):
-            raise Exception("Memory {num} is " +
-                            "not in bank {bank}".format(num=memory.number,
-                                                        bank=bank))
+            raise Exception("Memory {num} is not in bank {bank}".format(
+                            num=memory.number, bank=bank))
         _bitmap.bitmap[index // 32] &= ~(1 << ishft)
         self.__b2m_cache[bank.index].remove(memory.number)
         self.__m2b_cache[memory.number].remove(bank.index)
@@ -745,7 +742,7 @@ class FT7800Radio(FTx800Radio):
             try:
                 _settings = self._memobj.settings
                 setting = element.get_name()
-                if re.match('dtmf\d', setting):
+                if re.match(r'dtmf\d', setting):
                     # set dtmf fields
                     dtmfstr = str(element.value).strip()
                     newval = []
@@ -769,9 +766,10 @@ class FT7800Radio(FTx800Radio):
                 oldval = getattr(_settings, setting)
                 LOG.debug("Setting %s(%s) <= %s" % (setting, oldval, newval))
                 setattr(_settings, setting, newval)
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
+
 
 MEM_FORMAT_8800 = """
 #seekto 0x%X;
@@ -934,6 +932,7 @@ class FT8800RadioRight(FT8800Radio):
     VARIANT = "Right"
     _memstart = 0x2948
     _bankstart = 0x4BC8
+
 
 MEM_FORMAT_8900 = """
 #seekto 0x0708;

@@ -20,10 +20,8 @@ import struct
 from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
     RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, InvalidValueError, RadioSettings
+    RadioSettings
 from chirp.chirp_common import format_freq
-import os
-import time
 import logging
 from datetime import date
 
@@ -186,13 +184,13 @@ def isValidDate(month, day, year):
             max1 = 29
         else:
             max1 = 28
-    if(month < 1 or month > 12):
+    if (month < 1 or month > 12):
         LOG.debug("Invalid 'Last Program Date: Month'")
         return False
-    elif(day < 1 or day > max1):
+    elif (day < 1 or day > max1):
         LOG.debug("Invalid 'Last Program Date: Day'")
         return False
-    elif(year < 2014 or year > today.year):
+    elif (year < 2014 or year > today.year):
         LOG.debug("Invalid 'Last Program Date: Year'")
         return False
     return True
@@ -432,7 +430,7 @@ class TYTTH9800Base(chirp_common.Radio):
         _mem.step = STEPS.index(mem.tuning_step)
 
         for setting in mem.extra:
-            LOG.debug("@set_mem:", setting.get_name(), setting.value)
+            LOG.debug("@set_mem: %s %s", setting.get_name(), setting.value)
             setattr(_mem, setting.get_name(), setting.value)
 
     def get_settings(self):
@@ -635,7 +633,7 @@ class TYTTH9800Base(chirp_common.Radio):
 
                 LOG.debug("Setting %s(%s) <= %s" % (setting, oldval, newval))
                 setattr(_settings, setting, newval)
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 

@@ -14,8 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
-import os
 import struct
 import logging
 
@@ -75,15 +73,6 @@ TOTALERT_LIST = ["", "Off"] + ["%s seconds" % x for x in range(1, 11)]
 VOICE_LIST = ["Off", "Chinese", "English"]
 VOX_LIST = ["OFF"] + ["%s" % x for x in range(1, 17)]
 VOXDELAY_LIST = ["0.3", "0.5", "1.0", "1.5", "2.0", "3.0"]
-
-SETTING_LISTS = {
-    "bcl": BCL_LIST,
-    "tot": TIMEOUTTIMER_LIST,
-    "totalert": TOTALERT_LIST,
-    "voice": VOICE_LIST,
-    "vox": VOX_LIST,
-    "voxdelay": VOXDELAY_LIST,
-    }
 
 
 def _nc630a_enter_programming_mode(radio):
@@ -501,7 +490,7 @@ class NC630aRadio(chirp_common.CloneModeRadio):
 
                     LOG.debug("Setting %s = %s" % (setting, element.value))
                     setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 

@@ -13,8 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
-import os
 import struct
 import logging
 
@@ -34,7 +32,6 @@ from chirp.settings import (
     RadioSettingValueFloat,
     RadioSettingValueInteger,
     RadioSettingValueList,
-    RadioSettingValueString,
 )
 
 LOG = logging.getLogger(__name__)
@@ -99,7 +96,7 @@ AREA_LIST = ["China", "Japan", "Korea", "Malaysia", "American",
 MDF_LIST = ["Frequency", "Channel #", "Name"]
 RING_LIST = ["OFF"] + ["%s" % x for x in range(1, 11)]
 TOT_LIST = ["OFF"] + ["%s seconds" % x for x in range(30, 210, 30)]
-TOT2_LIST = TOT_LIST[1:]
+TOT2_LIST = ["OFF"] + ["%s seconds" % x for x in range(60, 240, 30)]
 VOICE_LIST = ["Off", "Chinese", "English"]
 VOX_LIST = ["OFF"] + ["%s" % x for x in range(1, 6)]
 WORKMODE_LIST = ["General", "PMR"]
@@ -115,20 +112,6 @@ WX_LIST = ["CH01 - 162.550",
            "CH10 - 161.750",
            "CH11 - 162.000"
            ]
-
-SETTING_LISTS = {
-    "ab": AB_LIST,
-    "abr": ABR_LIST,
-    "area": AREA_LIST,
-    "mdf": MDF_LIST,
-    "ring": RING_LIST,
-    "tot": TOT_LIST,
-    "tot": TOT2_LIST,
-    "voice": VOICE_LIST,
-    "vox": VOX_LIST,
-    "workmode": WORKMODE_LIST,
-    "wx": WX_LIST,
-    }
 
 FRS_FREQS1 = [462562500, 462587500, 462612500, 462637500, 462662500,
               462687500, 462712500]
@@ -657,8 +640,10 @@ class BFT8Radio(chirp_common.CloneModeRadio):
         self._set_tone(mem, _mem)
 
         # tx power
-        if mem.power:
-            _mem.lowpower = self.POWER_LEVELS.index(mem.power)
+        if str(mem.power) == "High":
+            _mem.lowpower = 0
+        elif str(mem.power) == "Low":
+            _mem.lowpower = 1
         else:
             _mem.lowpower = 0
 
@@ -841,7 +826,7 @@ class BFT8Radio(chirp_common.CloneModeRadio):
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -905,7 +890,7 @@ class RetevisRB27B(BFT8Radio):
 class RetevisRB27(RetevisRB27B):
     VENDOR = "Retevis"
     MODEL = "RB27"
-    DUPLEXES = ["", "+", "off"]
+    DUPLEXES = ['', '-', '+', 'off']
     POWER_LEVELS = [chirp_common.PowerLevel("High", watts=5.00),
                     chirp_common.PowerLevel("Low", watts=0.50)]
     VALID_BANDS = [(136000000, 174000000),
@@ -913,29 +898,8 @@ class RetevisRB27(RetevisRB27B):
     ODD_SPLIT = False
 
     _upper = 99
-    _gmrs = True
+    _gmrs = False  # sold as GMRS radio but supports full band TX/RX
     _frs = _murs = _pmr = False
-
-    def validate_memory(self, mem):
-        msgs = super().validate_memory(mem)
-
-        _msg_duplex = 'Duplex must be "off" for this frequency'
-        _msg_offset = 'Only simplex or +5MHz offset allowed on GMRS'
-
-        if mem.freq not in GMRS_FREQS:
-            if mem.duplex != "off":
-                msgs.append(chirp_common.ValidationWarning(_msg_duplex))
-        if mem.freq in FRS_FREQS3:
-            if mem.duplex and mem.offset != 5000000:
-                msgs.append(chirp_common.ValidationWarning(_msg_offset))
-            if mem.duplex and mem.duplex != "+":
-                msgs.append(chirp_common.ValidationWarning(_msg_offset))
-
-        return msgs
-
-    def check_set_memory_immutable_policy(self, existing, new):
-        existing.immutable = []
-        super().check_set_memory_immutable_policy(existing, new)
 
 
 @directory.register

@@ -16,8 +16,7 @@
 import logging
 import time
 
-from chirp import chirp_common, directory, memmap, errors
-from chirp import bitwise
+from chirp import chirp_common, directory, errors
 from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
     RadioSettingValueBoolean, RadioSettingValueString, \
@@ -183,7 +182,7 @@ class HobbyPCBRSUV3Radio(chirp_common.LiveRadio):
 
         tg = RadioSetting('TG%7s', 'CW Timeout Message',
                           RadioSettingValueString(0, 7,
-                                                   _get('TG')))
+                                                  _get('TG')))
         cw.append(tg)
 
         io = RadioSettingGroup('io', 'IO')

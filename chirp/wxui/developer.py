@@ -17,6 +17,7 @@ import functools
 import logging
 import os
 import serial
+import sys
 import tempfile
 
 import requests
@@ -30,6 +31,7 @@ from chirp.wxui import report
 
 LOG = logging.getLogger(__name__)
 BrowserChanged, EVT_BROWSER_CHANGED = wx.lib.newevent.NewCommandEvent()
+FROZEN = getattr(sys, 'frozen', False)
 
 
 def simple_diff(a, b, diffsonly=False):
@@ -181,6 +183,7 @@ class ChirpStringEditor(ChirpEditor):
 
         self._entry.Bind(wx.EVT_TEXT, self._edited)
         self._entry.Bind(wx.EVT_TEXT_ENTER, self._changed)
+        self._entry.SetEditable(not FROZEN)
 
     def refresh(self):
         self._entry.SetValue(str(self._obj))
@@ -220,6 +223,7 @@ class ChirpIntegerEditor(ChirpEditor):
             entry = wx.TextCtrl(self, value=fmt.format(int(self._obj)),
                                 style=wx.TE_PROCESS_ENTER)
             entry.SetFont(self._fixed_font)
+            entry.SetEditable(not FROZEN)
             sizer.Add(label, 0, wx.ALIGN_CENTER)
             sizer.Add(entry, 1, flag=wx.EXPAND)
             self._entries[name] = entry
@@ -271,6 +275,7 @@ class ChirpBCDEditor(ChirpEditor):
         self._entry = wx.TextCtrl(self, value=str(int(self._obj)),
                                   style=wx.TE_PROCESS_ENTER)
         self._entry.SetFont(self._fixed_font)
+        self._entry.SetEditable(not FROZEN)
         sizer.Add(self._entry, 1, wx.EXPAND)
         self._entry.Bind(wx.EVT_TEXT, self._edited)
         self._entry.Bind(wx.EVT_TEXT_ENTER, self._changed)
@@ -287,7 +292,7 @@ class ChirpBCDEditor(ChirpEditor):
             digits = self._obj.size() // 4
             assert val >= 0, _('Value must be zero or greater')
             assert len(entry.GetValue()) == digits, \
-                   _('Value must be exactly %i decimal digits') % digits
+                _('Value must be exactly %i decimal digits') % digits
         except (ValueError, AssertionError) as e:
             self._mark_error(entry, str(e))
         else:
@@ -458,6 +463,21 @@ class IssueModuleLoader:
                 a.get('content_type', '').startswith('text/') and
                 a['filesize'] < (256 * 1024)]
 
+    def get_user_is_developer(self, uid):
+        r = self.session.get('https://chirp.danplanet.com/users/%i.json' % uid,
+                             params={'include': 'memberships'})
+        LOG.debug('Fetched info for user %i (status %s)',
+                  uid, r.status_code)
+        r.raise_for_status()
+        data = r.json()
+        try:
+            membership = data['user']['memberships'][0]
+        except IndexError:
+            LOG.debug('User %s(%i) has no roles', data['user']['login'], uid)
+            return False
+        roles = [r['name'] for r in membership['roles']]
+        return 'Developer' in roles or 'Manager' in roles
+
     def get_attachment_from_user(self, issue, attachments):
         attachment_strings = {
             '%s from %s (%s)' % (a['filename'],
@@ -473,6 +493,17 @@ class IssueModuleLoader:
             len(choices) - 1,
             parent=self._parent)
         if choice:
+            isdev = self.get_user_is_developer(
+                attachment_strings[choice]['author']['id'])
+            if not isdev:
+                r = wx.MessageBox(
+                    _('The author of this module is not a recognized '
+                      'CHIRP developer. It is recommended that you not '
+                      'load this module as it could pose a security risk. '
+                      'Proceed anyway?'), _('Security Risk'),
+                    wx.YES_NO | wx.NO_DEFAULT)
+                if r != wx.YES:
+                    return
             return attachment_strings[choice]
 
     def run(self):
@@ -505,10 +536,11 @@ class IssueModuleLoader:
         LOG.debug('Fetching attachment URL %s' % attachment['content_url'])
         r = requests.get(attachment['content_url'])
         modfile = tempfile.mktemp('.py', 'loaded-%i-' % attachment['id'])
-        header = ('# Loaded from issue %i attachment %i: %s\n' % (
+        trailer = ('\n\n# Loaded from issue %i attachment %i: %s\n' % (
             issue, attachment['id'], attachment['content_url']))
         with open(modfile, 'wb') as f:
-            f.write(header.encode())
             f.write(r.content)
+            f.write(trailer.encode())
+
         LOG.debug('Wrote attachment to %s' % modfile)
         return modfile

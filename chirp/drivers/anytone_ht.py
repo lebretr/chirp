@@ -13,9 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import struct
-import time
 import logging
 
 from chirp import bitwise
@@ -27,7 +25,7 @@ from chirp import util
 from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
     RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, InvalidValueError, RadioSettings
+    RadioSettings
 
 LOG = logging.getLogger(__name__)
 
@@ -251,6 +249,7 @@ def _read(radio, length):
         LOG.debug(util.hexprint(data))
         raise errors.RadioError("Short read from radio")
     return data
+
 
 valid_model = [b'TERMN8R', b'OBLTR8R']
 
@@ -939,7 +938,7 @@ class AnyToneTERMN8RRadio(chirp_common.CloneModeRadio,
                     else:
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 

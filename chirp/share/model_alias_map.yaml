@@ -10,6 +10,12 @@ Baiston:
 - alt: Baofeng BF-888
   model: BST-2100
 Baofeng/Pofung:
+- alt: BF-1901
+  model: Baofeng BF-1902
+- alt: BF-1901
+  model: Baofeng BF-1903
+- alt: Baofeng BF-888
+  model: Baofeng BF-777S
 - alt: UV-5R
   model: 997-S (Foscam Digital Technologies)
 - alt: UV-5R
@@ -211,6 +217,12 @@ Retevis:
   model: RT5 with 2 power levels
 - alt: Baofeng UV-B5
   model: RT-B6
+- alt: Retevis RB27
+  model: RB27B (full band support)
+- alt: Retevis RB27
+  model: RB27V (full band support)
+- alt: Retevis RB27
+  model: RB627B (full band support)
 Rugged Radios:
 - alt: Baofeng UV-5R
   model: RH5R, RH5R-V2
@@ -268,6 +280,8 @@ Wurui:
 Yaesu:
 - alt: FTM-3200DR
   model: FTM-3100
+- alt: VX-170
+  model: FT-270
 Zastone:
 - alt: QYT KT8900D
   model: MP-380
@@ -288,3 +302,8 @@ youRUSH:
   model: UV-9RUSH PRO
 - alt: Baofeng UV-82
   model: UV-82RUSH
+Quansheng:
+- alt: TG-UV2+
+  model: TG-UV2
+- alt: UV-K5
+  model: UV-K5(8)

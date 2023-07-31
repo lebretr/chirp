@@ -1,5 +1,5 @@
-# Copyright 2018 by Rick DeWitt (aa0rd@yahoo.com>
-# Bug fix for issue #8183, invalid APO Off value
+# Copyright 2018 by Rick DeWitt (aa0rd@yahoo.com) V2.0
+# PY3 Compliant release.
 # Thanks to Filippi Marco <iz3gme.marco@gmail.com> for Yaesu processes
 #
 # This program is free software: you can redistribute it and/or modify
@@ -22,19 +22,21 @@ from chirp import chirp_common, util, memmap, errors, directory, bitwise
 from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
     RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, RadioSettings
+    RadioSettings
 import time
+import struct
 import logging
 
 LOG = logging.getLogger(__name__)
 
-CMD_ACK = 0x06
+CMD_ACK = b'\x06'
 EX_MODES = ["USER-L", "USER-U", "LSB+CW", "USB+CW", "RTTY-L", "RTTY-U", "N/A"]
 T_STEPS = sorted(list(chirp_common.TUNING_STEPS))
 T_STEPS.remove(30.0)
 T_STEPS.remove(100.0)
 T_STEPS.remove(125.0)
 T_STEPS.remove(200.0)
+
 
 @directory.register
 class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
@@ -44,22 +46,23 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
     COM_PRTY = 'N'   # parity checking
     COM_STOP = 1   # stop bits
     MODEL = "FT-450D"
+    NEEDS_COMPAT_SERIAL = False
 
     DUPLEX = ["", "-", "+"]
     MODES = ["LSB", "USB",  "CW",  "AM", "FM", "RTTY-L",
-            "USER-L", "USER-U", "NFM", "CWR"]
+             "USER-L", "USER-U", "NFM", "CWR"]
     TMODES = ["", "Tone", "TSQL"]
     STEPSFM = [5.0, 6.25, 10.0, 12.5, 15.0, 20.0, 25.0, 50.0]
     STEPSAM = [2.5, 5.0, 9.0, 10.0, 12.5, 25.0]
     STEPSSSB = [1.0, 2.5, 5.0]
     VALID_BANDS = [(100000, 33000000), (33000000, 56000000)]
     FUNC_LIST = ['MONI', 'N/A', 'PBAK', 'PLAY1', 'PLAY2', 'PLAY3', 'QSPLIT',
-            'SPOT', 'SQLOFF', 'SWR', 'TXW', 'VCC', 'VOICE2', 'VM1MONI',
-            'VM1REC', 'VM1TX', 'VM2MONI', 'VM2REC', 'VM2TX', 'DOWN', 'FAST',
-            'UP', 'DSP', 'IPO/ATT', 'NB', 'AGC' , 'MODEDN',  'MODEUP',
-            'DSP/SEL', 'KEYER', 'CLAR' , 'BANDDN', 'BANDUP', 'A=B', 'A/B',
-            'LOCK', 'TUNE', 'VOICE', 'MW', 'V/M', 'HOME', 'RCL', 'VOX', 'STO',
-            'STEP', 'SPLIT', 'PMS', 'SCAN', 'MENU', 'DIMMER', 'MTR']
+                 'SPOT', 'SQLOFF', 'SWR', 'TXW', 'VCC', 'VOICE2', 'VM1MONI',
+                 'VM1REC', 'VM1TX', 'VM2MONI', 'VM2REC', 'VM2TX', 'DOWN', 'FAST',
+                 'UP', 'DSP', 'IPO/ATT', 'NB', 'AGC', 'MODEDN',  'MODEUP',
+                 'DSP/SEL', 'KEYER', 'CLAR', 'BANDDN', 'BANDUP', 'A=B', 'A/B',
+                 'LOCK', 'TUNE', 'VOICE', 'MW', 'V/M', 'HOME', 'RCL', 'VOX', 'STO',
+                 'STEP', 'SPLIT', 'PMS', 'SCAN', 'MENU', 'DIMMER', 'MTR']
     CHARSET = list(chirp_common.CHARSET_ASCII)
     CHARSET.remove("\\")
 
@@ -233,7 +236,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
                 mym_cw:1,
                 mym_usb:1,
                 mym_lsb:1;
-            u8  myb_24:1,          // My Band: 24Mhz set = OFF
+            u8  myb_24:1,          // My Band: 24MHz set = OFF
                 myb_21:1,
                 myb_18:1,
                 myb_14:1,
@@ -300,7 +303,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
 
     """
     _CALLSIGN_CHARSET = [chr(x) for x in list(range(ord("0"), ord("9") + 1)) +
-                        list(range(ord("A"), ord("Z") + 1)) + [ord(" ")]]
+                         list(range(ord("A"), ord("Z") + 1)) + [ord(" ")]]
     _CALLSIGN_CHARSET_REV = dict(zip(_CALLSIGN_CHARSET,
                                      range(0, len(_CALLSIGN_CHARSET))))
 
@@ -408,13 +411,13 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
             if data:
                 break
             time.sleep(0.5)
-        if len(data) == block + 2 and data[0] == chr(blocknum):
+        if len(data) == block + 2 and data[0] == blocknum:
             checksum = yaesu_clone.YaesuChecksum(1, block)
             if checksum.get_existing(data) != \
                     checksum.get_calculated(data):
                 raise Exception("Checksum Failed [%02X<>%02X] block %02X" %
                                 (checksum.get_existing(data),
-                                checksum.get_calculated(data), blocknum))
+                                 checksum.get_calculated(data), blocknum))
             # Remove the block number and checksum
             data = data[1:block + 1]
         else:   # Use this info to decode a new Yaesu model
@@ -433,7 +436,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
 
         start = time.time()
 
-        data = ""
+        data = b""
         blocks = 0
         status = chirp_common.Status()
         status.msg = _("Cloning from radio")
@@ -447,12 +450,12 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
                 repeat = 1
             for _i in range(0, repeat):
                 data += self._read(block, blocks)
-                self.pipe.write(chr(CMD_ACK))
+                self.pipe.write(CMD_ACK)
                 blocks += 1
                 status.cur = blocks
                 self.status_fn(status)
-        data += self.MODEL      # Append ID
-        return memmap.MemoryMap(data)
+        data += self.MODEL.encode()
+        return memmap.MemoryMapBytes(data)
 
     def _clone_out(self):
         self.pipe.baudrate = self.BAUD_RATE
@@ -475,20 +478,25 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
             for _i in range(0, repeat):
                 time.sleep(0.01)
                 checksum = yaesu_clone.YaesuChecksum(pos, pos + block - 1)
-                self.pipe.write(chr(blocks))
-                self.pipe.write(self.get_mmap()[pos:pos + block])
-                self.pipe.write(chr(checksum.get_calculated(self.get_mmap())))
+                LOG.debug("Sending block %s" % hex(blocks))
+                self.pipe.write(struct.pack('B', blocks))
+                blkdat = self.get_mmap()[pos:pos + block]
+                LOG.debug("Sending %d bytes:\n%s"
+                          % (len(blkdat), util.hexprint(blkdat)))
+                self.pipe.write(blkdat)
+                xs = checksum.get_calculated(self.get_mmap())
+                LOG.debug("Sending checksum %s" % hex(xs))
+                self.pipe.write(struct.pack('B', xs))
                 buf = self.pipe.read(1)
-                if not buf or buf[0] != chr(CMD_ACK):
+                if not buf or buf[:1] != CMD_ACK:
                     time.sleep(delay)
                     buf = self.pipe.read(1)
-                if not buf or buf[0] != chr(CMD_ACK):
+                if not buf or buf[:1] != CMD_ACK:
                     raise Exception(_("Radio did not ack block %i") % blocks)
                 pos += block
                 blocks += 1
                 status.cur = blocks
                 self.status_fn(status)
-
 
     def sync_in(self):
         try:
@@ -515,7 +523,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
     def get_features(self):
         rf = chirp_common.RadioFeatures()
         rf.has_bank = False
-        rf.has_dtcs= False
+        rf.has_dtcs = False
         rf.valid_modes = [x for x in self.MODES if x in chirp_common.MODES]
         rf.valid_tmodes = list(self.TMODES)
         rf.valid_duplexes = list(self.DUPLEX)
@@ -608,7 +616,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
                          "frequency", "power", "duplex", "offset"]
         else:
             raise Exception("Sorry, you can't edit that special"
-                        " memory channel %i." % mem.number)
+                            " memory channel %i." % mem.number)
 
         mem = self._get_memory(mem, _mem)
         mem.immutable = immutable
@@ -623,7 +631,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         cur_mem = self._get_special(self.SPECIAL_MEMORIES_REV[mem.number])
 
         if mem.number in range(self.FIRST_VFOA_INDEX,
-                            self.LAST_VFOA_INDEX - 1, -1):
+                               self.LAST_VFOA_INDEX - 1, -1):
             _mem = self._memobj.vfoa[-self.LAST_VFOA_INDEX + mem.number]
         elif mem.number in range(self.FIRST_VFOB_INDEX,
                                  self.LAST_VFOB_INDEX - 1, -1):
@@ -647,7 +655,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
                         ~ (1 << bitindex)
                 # pylint get confused by &= operator
                 self._memobj.pmsvisible = self._memobj.pmsvisible & \
-                        ~ (1 << bitindex)
+                    ~ (1 << bitindex)
                 return
             # pylint get confused by |= operator
             self._memobj.pmsvisible = self._memobj.pmsvisible | 1 << bitindex
@@ -661,16 +669,16 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
             if key != "extd_number":
                 if cur_mem.__dict__[key] != mem.__dict__[key]:
                     raise errors.RadioError("Editing field `%s' " % key +
-                                        "is not supported on this channel")
+                                            "is not supported on this channel")
 
         self._set_memory(mem, _mem)
 
     def _get_normal(self, number):
         _mem = self._memobj.memory[number - 1]
         used = (self._memobj.visible[(number - 1) / 8] >> (number - 1) % 8) \
-                & 0x01
+            & 0x01
         valid = (self._memobj.filled[(number - 1) / 8] >> (number - 1) % 8) \
-                & 0x01
+            & 0x01
 
         mem = chirp_common.Memory()
         mem.number = number
@@ -685,7 +693,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
     def _set_normal(self, mem):
         _mem = self._memobj.memory[mem.number - 1]
         wasused = (self._memobj.visible[(mem.number - 1) / 8] >>
-                    (mem.number - 1) % 8) & 0x01
+                   (mem.number - 1) % 8) & 0x01
         wasvalid = (self._memobj.filled[(mem.number - 1) / 8] >>
                     (mem.number - 1) % 8) & 0x01
 
@@ -703,9 +711,9 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
             _mem.set_raw("\x00" * (_mem.size() // 8))    # clean up
 
         self._memobj.visible[(mem.number - 1) // 8] |= 1 << (mem.number - 1) \
-                        % 8
+            % 8
         self._memobj.filled[(mem.number - 1) // 8] |= 1 << (mem.number - 1) \
-                        % 8
+            % 8
         self._set_memory(mem, _mem)
 
     def _get_memory(self, mem, _mem):
@@ -720,7 +728,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
             else:
                 vx = 8          # NFM
         if vx == 10:         # CWR
-                vx = 9
+            vx = 9
         if vx == 5:         # Data/Dual mode
             if _mem.mode2 == 0:          # RTTY-L
                 vx = 5
@@ -773,32 +781,32 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         mem.extra.append(rs)
 
         rs = RadioSetting("cnturon", "Contour Filter",
-                          RadioSettingValueBoolean(_mem.cnturon ))
+                          RadioSettingValueBoolean(_mem.cnturon))
         rs.set_doc("Contour filter on/off")
         mem.extra.append(rs)
 
         options = ["Peak", "Null"]
         rs = RadioSetting("cnturpk", "Contour Filter Mode",
                           RadioSettingValueList(options,
-                                options[_mem.cnturpk]))
+                                                options[_mem.cnturpk]))
         mem.extra.append(rs)
 
         options = ["Low", "High"]
         rs = RadioSetting("cnturgn", "Contour Filter Gain",
                           RadioSettingValueList(options,
-                                options[_mem.cnturgn]))
+                                                options[_mem.cnturgn]))
         rs.set_doc("Filter gain/attenuation")
         mem.extra.append(rs)
 
         options = ["-2", "-1", "Center", "+1", "+2"]
         rs = RadioSetting("cnturmd", "Contour Filter Notch",
                           RadioSettingValueList(options,
-                                options[_mem.cnturmd]))
+                                                options[_mem.cnturmd]))
         rs.set_doc("Filter notch offset")
         mem.extra.append(rs)
 
         rs = RadioSetting("notch", "Notch Filter",
-                          RadioSettingValueBoolean(_mem.notch ))
+                          RadioSettingValueBoolean(_mem.notch))
         rs.set_doc("IF bandpass filter")
         mem.extra.append(rs)
 
@@ -848,7 +856,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
                           "8", "9", "10", "11"]
         rs = RadioSetting("dnr_val", "DSP Noise Reduction Alg",
                           RadioSettingValueList(options,
-                                        options[ _mem.dnr_val]))
+                                                options[_mem.dnr_val]))
         rs.set_doc("Digital noise reduction algorithm number (1-11)")
         mem.extra.append(rs)
 
@@ -898,9 +906,9 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         except ValueError:
             pass
         _mem.freq = mem.freq
-        _mem.uprband  = 0
+        _mem.uprband = 0
         if mem.freq >= 33000000:
-            _mem.uprband  = 1
+            _mem.uprband = 1
         _mem.offset = mem.offset
         _mem.tmode = self.TMODES.index(mem.tmode)
         _mem.tone = chirp_common.TONES.index(mem.rtone)
@@ -930,7 +938,6 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
             else:
                 setattr(_mem, setting.get_name(), setting.value)
 
-
     @classmethod
     def match_model(cls, filedata, filename):
         """Match the opened/downloaded image to the correct version"""
@@ -959,7 +966,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         ary = ""
         for j in range(0, knt, 1):
             chx = ord(str(setting.value)[j])
-            if chx < 32 or  chx >  125:     # strip non-printing
+            if chx < 32 or chx > 125:     # strip non-printing
                 ary += " "
             else:
                 ary += str(setting.value)[j]
@@ -1008,7 +1015,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options[0] = "Off"
         rs = RadioSetting("tot", "TX 'TOT' time-out (mins)",
                           RadioSettingValueList(options,
-                          options[_settings.tot]))
+                                                options[_settings.tot]))
         tab.append(rs)
 
         bx = not _settings.cat_rts     # Convert from Enable=0
@@ -1020,13 +1027,13 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["0", "100ms", "1000ms", "3000ms"]
         rs = RadioSetting("cat_tot", "CAT Timeout",
                           RadioSettingValueList(options,
-                          options[_settings.cat_tot]))
+                                                options[_settings.cat_tot]))
         tab.append(rs)
 
         options = ["4800", "9600", "19200", "38400", "Data"]
         rs = RadioSetting("catrate", "CAT rate",
                           RadioSettingValueList(options,
-                          options[_settings.catrate]))
+                                                options[_settings.catrate]))
         tab.append(rs)
 
         rs = RadioSetting("mem_grp", "Mem groups",
@@ -1060,13 +1067,12 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["ATAS", "EXT ATU", "INT ATU", "INTRATU", "F-TRANS"]
         rs = RadioSetting("tuner", "Antenna Tuner",
                           RadioSettingValueList(options,
-                          options[_settings.tuner]))
+                                                options[_settings.tuner]))
         tab.append(rs)
 
         rs = RadioSetting("rfpower", "RF power (watts)",
                           RadioSettingValueInteger(5, 100, _settings.rfpower))
         tab.append(rs)      # End of _do_general_settings
-
 
     def _do_cw_settings(self, cw):        # - - - CW - - -
         _settings = self._memobj.settings
@@ -1079,7 +1085,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["%i Hz" % i for i in range(400, 801, 100)]
         rs = RadioSetting("cwpitch", "CW pitch",
                           RadioSettingValueList(options,
-                          options[_settings.cwpitch]))
+                                                options[_settings.cwpitch]))
         cw.append(rs)
 
         rs = RadioSetting("cwspeed", "CW speed (wpm)",
@@ -1090,13 +1096,13 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["1:%1.1f" % (i / 10) for i in range(25, 46, 1)]
         rs = RadioSetting("cwweigt", "CW weight",
                           RadioSettingValueList(options,
-                          options[_settings.cwweigt]))
+                                                options[_settings.cwweigt]))
         cw.append(rs)
 
         options = ["15ms", "20ms", "25ms", "30ms"]
         rs = RadioSetting("cw_qsk", "CW delay before TX in QSK mode",
                           RadioSettingValueList(options,
-                          options[_settings.cw_qsk]))
+                                                options[_settings.cw_qsk]))
         cw.append(rs)
 
         rs = RadioSetting("cwstone_sgn", "CW sidetone volume Linked",
@@ -1106,18 +1112,18 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
 
         rs = RadioSetting("cwstone_lnk", "CW sidetone linked volume",
                           RadioSettingValueInteger(-50, 50,
-                                        _settings.cwstone_lnk))
+                                                   _settings.cwstone_lnk))
         cw.append(rs)
 
         rs = RadioSetting("cwstone_fix", "CW sidetone fixed volume",
                           RadioSettingValueInteger(0, 100,
-                          _settings.cwstone_fix))
+                                                   _settings.cwstone_fix))
         cw.append(rs)
 
-        options = [ "Numeric", "Alpha", "Mixed"]
+        options = ["Numeric", "Alpha", "Mixed"]
         rs = RadioSetting("cwtrain", "CW Training mode",
                           RadioSettingValueList(options,
-                          options[_settings.cwtrain]))
+                                                options[_settings.cwtrain]))
         cw.append(rs)
 
         rs = RadioSetting("cw_auto", "CW key jack- auto CW mode",
@@ -1128,32 +1134,31 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["Normal", "Reverse"]
         rs = RadioSetting("cw_key", "CW paddle wiring",
                           RadioSettingValueList(options,
-                          options[_settings.cw_key]))
+                                                options[_settings.cw_key]))
         cw.append(rs)
 
         rs = RadioSetting("beacon_time", "CW beacon Tx interval (secs)",
                           RadioSettingValueInteger(0, 255,
-                          _settings.beacon_time))
+                                                   _settings.beacon_time))
         cw.append(rs)
 
         tmp = self._chars2str(_beacon.t1, 40)
-        rs=RadioSetting("t1", "CW Beacon Line 1",
-                        RadioSettingValueString(0, 40, tmp))
+        rs = RadioSetting("t1", "CW Beacon Line 1",
+                          RadioSettingValueString(0, 40, tmp))
         rs.set_apply_callback(self._my_str2ary, _beacon, "t1", 40)
         cw.append(rs)
 
         tmp = self._chars2str(_beacon.t2, 40)
-        rs=RadioSetting("t2", "CW Beacon Line 2",
-                        RadioSettingValueString(0, 40, tmp))
+        rs = RadioSetting("t2", "CW Beacon Line 2",
+                          RadioSettingValueString(0, 40, tmp))
         rs.set_apply_callback(self._my_str2ary, _beacon, "t2", 40)
         cw.append(rs)
 
         tmp = self._chars2str(_beacon.t3, 40)
-        rs=RadioSetting("t3", "CW Beacon Line 3",
-                        RadioSettingValueString(0, 40, tmp))
+        rs = RadioSetting("t3", "CW Beacon Line 3",
+                          RadioSettingValueString(0, 40, tmp))
         rs.set_apply_callback(self._my_str2ary, _beacon, "t3", 40)
         cw.append(rs)       # END _do_cw_settings
-
 
     def _do_panel_settings(self, pnlset):    # - - - Panel settings
         _settings = self._memobj.settings
@@ -1167,7 +1172,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["440Hz", "880Hz", "1760Hz"]
         rs = RadioSetting("beepton", "Beep frequency",
                           RadioSettingValueList(options,
-                          options[_settings.beepton]))
+                                                options[_settings.beepton]))
         pnlset.append(rs)
 
         rs = RadioSetting("beepvol_sgn", "Beep volume Linked",
@@ -1177,41 +1182,41 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
 
         rs = RadioSetting("beepvol_lnk", "Linked beep volume",
                           RadioSettingValueInteger(-50, 50,
-                          _settings.beepvol_lnk))
+                                                   _settings.beepvol_lnk))
         rs.set_doc("Relative to AF-Gain setting.")
         pnlset.append(rs)
 
         rs = RadioSetting("beepvol_fix", "Fixed beep volume",
                           RadioSettingValueInteger(0, 100,
-                          _settings.beepvol_fix))
+                                                   _settings.beepvol_fix))
         rs.set_doc("When Linked setting is unchecked.")
         pnlset.append(rs)
 
         rs = RadioSetting("cont", "LCD Contrast",
-                          RadioSettingValueInteger(1, 24, _settings.cont ))
+                          RadioSettingValueInteger(1, 24, _settings.cont))
         rs.set_doc("This setting does not appear to do anything...")
         pnlset.append(rs)
 
         rs = RadioSetting("dimmer", "LCD Dimmer",
-                          RadioSettingValueInteger(1, 8,  _settings.dimmer ))
+                          RadioSettingValueInteger(1, 8,  _settings.dimmer))
         pnlset.append(rs)
 
         options = ["RF-Gain", "Squelch"]
         rs = RadioSetting("sql_rfg", "Squelch/RF-Gain",
                           RadioSettingValueList(options,
-                          options[_settings.sql_rfg]))
+                                                options[_settings.sql_rfg]))
         pnlset.append(rs)
 
         options = ["Frequencies", "Panel", "All"]
         rs = RadioSetting("lockmod", "Lock Mode",
                           RadioSettingValueList(options,
-                          options[_settings.lockmod]))
+                                                options[_settings.lockmod]))
         pnlset.append(rs)
 
         options = ["Dial", "SEL"]
         rs = RadioSetting("clar_btn", "CLAR button control",
                           RadioSettingValueList(options,
-                          options[_settings.clar_btn]))
+                                                options[_settings.clar_btn]))
         pnlset.append(rs)
 
         if _settings.dialstp_mode == 0:             # AM/FM
@@ -1220,13 +1225,13 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
             options = ["AM/FM:100Hz", "AM/FM:200Hz"]
         rs = RadioSetting("dialstp", "Dial tuning step",
                           RadioSettingValueList(options,
-                          options[_settings.dialstp]))
+                                                options[_settings.dialstp]))
         pnlset.append(rs)
 
         options = ["0.5secs", "1.0secs", "1.5secs", "2.0secs"]
         rs = RadioSetting("keyhold", "Buttons hold-to-activate time",
                           RadioSettingValueList(options,
-                          options[_settings.keyhold]))
+                                                options[_settings.keyhold]))
         pnlset.append(rs)
 
         rs = RadioSetting("m_tune", "Memory tune",
@@ -1238,19 +1243,19 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         pnlset.append(rs)
 
         options = ["CW Sidetone", "CW Speed", "100KHz step", "1MHz Step",
-                          "Mic Gain", "RF Power"]
+                   "Mic Gain", "RF Power"]
         rs = RadioSetting("seldial", "SEL dial 2nd function (push)",
                           RadioSettingValueList(options,
-                          options[_settings.seldial]))
+                                                options[_settings.seldial]))
         pnlset.append(rs)
     # End _do_panel_settings
 
-    def _do_panel_buttons(self, pnlcfg):      #- - - Current Panel Config
+    def _do_panel_buttons(self, pnlcfg):      # - - - Current Panel Config
         _settings = self._memobj.settings
 
         rs = RadioSetting("pnl_cs", "C.S. Function",
                           RadioSettingValueList(self.FUNC_LIST,
-                          self.FUNC_LIST[_settings.pnl_cs]))
+                                                self.FUNC_LIST[_settings.pnl_cs]))
         pnlcfg.append(rs)
 
         rs = RadioSetting("nb", "Noise blanker",
@@ -1260,7 +1265,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["Auto", "Fast",  "Slow", "Auto/Fast", "Auto/Slow", "?5?"]
         rs = RadioSetting("agc", "AGC",
                           RadioSettingValueList(options,
-                          options[_settings.agc]))
+                                                options[_settings.agc]))
         pnlcfg.append(rs)
 
         rs = RadioSetting("keyer", "Keyer",
@@ -1278,7 +1283,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["PO",  "ALC", "SWR"]
         rs = RadioSetting("mtr_mode", "S-Meter mode",
                           RadioSettingValueList(options,
-                          options[_settings.mtr_mode]))
+                                                options[_settings.mtr_mode]))
         pnlcfg.append(rs)
         # End _do_panel_Buttons
 
@@ -1291,40 +1296,40 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
 
         rs = RadioSetting("vox_gain", "VOX Gain",
                           RadioSettingValueInteger(0, 100,
-                          _settings.vox_gain))
+                                                   _settings.vox_gain))
         voxdat.append(rs)
 
         rs = RadioSetting("dig_vox", "Digital VOX Gain",
                           RadioSettingValueInteger(0, 100,
-                          _settings.dig_vox))
+                                                   _settings.dig_vox))
         voxdat.append(rs)
 
         rs = RadioSetting("d_disp", "User-L/U freq offset (Hz)",
                           RadioSettingValueInteger(-3000, 30000,
-                          _settings.d_disp, 10))
+                                                   _settings.d_disp, 10))
         voxdat.append(rs)
 
         options = ["170Hz", "200Hz", "425Hz", "850Hz"]
         rs = RadioSetting("rty_sft", "RTTY FSK Freq Shift",
                           RadioSettingValueList(options,
-                          options[_settings.rty_sft]))
+                                                options[_settings.rty_sft]))
         voxdat.append(rs)
 
         options = ["1275Hz", "2125Hz"]
         rs = RadioSetting("rty_ton", "RTTY FSK Mark tone",
                           RadioSettingValueList(options,
-                          options[_settings.rty_ton]))
+                                                options[_settings.rty_ton]))
         voxdat.append(rs)
 
         options = ["Normal", "Reverse"]
         rs = RadioSetting("rtyrpol", "RTTY Mark/Space RX polarity",
                           RadioSettingValueList(options,
-                          options[_settings.rtyrpol]))
+                                                options[_settings.rtyrpol]))
         voxdat.append(rs)
 
         rs = RadioSetting("rtytpol", "RTTY Mark/Space TX polarity",
                           RadioSettingValueList(options,
-                          options[_settings.rtytpol]))
+                                                options[_settings.rtytpol]))
         voxdat.append(rs)
         # End _do_vox_settings
 
@@ -1338,7 +1343,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         options = ["Low", "Normal", "High"]
         rs = RadioSetting("micgain", "Mic Gain",
                           RadioSettingValueList(options,
-                          options[_settings.micgain]))
+                                                options[_settings.micgain]))
         mic.append(rs)
 
         rs = RadioSetting("micscan", "Mic scan enabled",
@@ -1348,22 +1353,22 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
 
         rs = RadioSetting("pm_dwn", "Mic Down button function",
                           RadioSettingValueList(self.FUNC_LIST,
-                          self.FUNC_LIST[_settings.pm_dwn]))
+                                                self.FUNC_LIST[_settings.pm_dwn]))
         mic.append(rs)
 
         rs = RadioSetting("pm_fst", "Mic Fast button function",
                           RadioSettingValueList(self.FUNC_LIST,
-                          self.FUNC_LIST[_settings.pm_fst]))
+                                                self.FUNC_LIST[_settings.pm_fst]))
         mic.append(rs)
 
         rs = RadioSetting("pm_up", "Mic Up button function",
                           RadioSettingValueList(self.FUNC_LIST,
-                          self.FUNC_LIST[_settings.pm_up]))
+                                                self.FUNC_LIST[_settings.pm_up]))
         mic.append(rs)
         # End _do_mic_settings
 
     def _do_mymodes_settings(self, mymodes):    # - - MYMODES
-        _settings = self._memobj.settings # Inverted Logic requires callback
+        _settings = self._memobj.settings  # Inverted Logic requires callback
 
         bx = not _settings.mym_lsb
         rs = RadioSetting("mym_lsb", "LSB", RadioSettingValueBoolean(bx))
@@ -1397,7 +1402,7 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
         # End _do_mymodes_settings
 
     def _do_mybands_settings(self, mybands):    # - - MYBANDS Settings
-        _settings = self._memobj.settings # Inverted Logic requires callback
+        _settings = self._memobj.settings  # Inverted Logic requires callback
 
         bx = not _settings.myb_1_8
         rs = RadioSetting("myb_1_8", "1.8 MHz", RadioSettingValueBoolean(bx))
@@ -1481,6 +1486,6 @@ class FT450DRadio(yaesu_clone.YaesuCloneModeRadio):
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise

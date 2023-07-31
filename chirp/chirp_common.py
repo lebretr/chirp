@@ -395,7 +395,7 @@ class Memory:
     def parse_freq(self, freqstr):
         """Set the frequency from a string"""
         self.freq = parse_freq(freqstr)
-        return self.freqx
+        return self.freq
 
     def __str__(self):
         if self.tmode == "Tone":
@@ -606,29 +606,36 @@ class DVMemory(Memory):
             self.dv_code = 0
 
 
-class FrozenMemory(Memory):
-    def __init__(self, source):
-        self.__dict__['_frozen'] = False
-        for k, v in source.__dict__.items():
-            setattr(self, k, v)
+def FrozenMemory(source):
+    class _FrozenMemory(source.__class__):
+        def __init__(self, source):
+            self.__dict__['_frozen'] = False
+            for k, v in source.__dict__.items():
+                if k == '_frozen':
+                    continue
+                setattr(self, k, v)
 
-        self.__dict__['_frozen'] = True
+            self.__dict__['_frozen'] = True
 
-    def __setattr__(self, k, v):
-        if self._frozen:
-            # This should really be an error, but we have a number of drivers
-            # that make modificatons during set_memory(). So this just has to
-            # be a warning for now. Later it could turn into a TypeError.
-            caller = inspect.getframeinfo(inspect.stack()[1][0])
-            LOG.warning(
-                '%s@%i: Illegal set on attribute %s - Fix this driver!' % (
-                    caller.filename, caller.lineno, k))
-        super().__setattr__(k, v)
+        def __setattr__(self, k, v):
+            if self._frozen:
+                # This should really be an error, but we have a number of
+                # drivers that make modifications during set_memory(). So this
+                # just has to be a warning for now. Later it could turn into
+                # a TypeError.
+                caller = inspect.getframeinfo(inspect.stack()[1][0])
+                LOG.warning(
+                    '%s@%i: Illegal set on attribute %s - Fix this driver!' % (
+                        caller.filename, caller.lineno, k))
+            super().__setattr__(k, v)
 
-    def dupe(self):
-        m = Memory()
-        m.clone(self)
-        return m
+        def dupe(self):
+            m = Memory()
+            m.clone(self)
+            delattr(m, '_frozen')
+            return m
+
+    return _FrozenMemory(source)
 
 
 class MemoryMapping(object):
@@ -909,7 +916,7 @@ class RadioFeatures:
                   "Indicates that the radio supports general settings")
         self.init("has_variable_power", False,
                   "Indicates the radio supports any power level between the "
-                  "min and max in valid_powe_levels")
+                  "min and max in valid_power_levels")
 
         self.init("valid_modes", list(MODES),
                   "Supported emission (or receive) modes")
@@ -967,7 +974,7 @@ class RadioFeatures:
         return self.__dict__[name]
 
     def validate_memory(self, mem):
-        """Return a list of warnings and errors that will be encoundered
+        """Return a list of warnings and errors that will be encountered
         if trying to set @mem on the current radio"""
         msgs = []
 
@@ -1119,7 +1126,12 @@ class Alias(object):
 class Radio(Alias):
     """Base class for all Radio drivers"""
     BAUD_RATE = 9600
+    # Whether or not we should use RTS/CTS flow control
     HARDWARE_FLOW = False
+    # Whether or not we should assert DTR when opening the serial port
+    WANTS_DTR = True
+    # Whether or not we should assert RTS when opening the serial port
+    WANTS_RTS = True
     ALIASES = []
     NEEDS_COMPAT_SERIAL = True
     FORMATS = []
@@ -1157,7 +1169,7 @@ class Radio(Alias):
         in the radio's memory. The memory should accurately represent what is
         actually stored in the radio as closely as possible. If the radio
         does not support changing some attributes of the location in question,
-        the Memory.immutable list should be set approproately.
+        the Memory.immutable list should be set appropriately.
 
         NB: No changes to the radio's memory should occur as a result of
         calling get_memory().
@@ -1216,7 +1228,7 @@ class Radio(Alias):
         return []
 
     def validate_memory(self, mem):
-        """Return a list of warnings and errors that will be encoundered
+        """Return a list of warnings and errors that will be encountered
         if trying to set @mem on the current radio"""
         rf = self.get_features()
         return rf.validate_memory(mem)
@@ -1257,7 +1269,7 @@ class Radio(Alias):
         rules in order to comply with FCC type acceptance, which requires
         overriding this behavior.
 
-        ** This should almost never be overidden in your driver.
+        ** This should almost never be overridden in your driver.
 
         ** This must not communicate with the radio, if implemented on a live-
            mode driver.
@@ -1370,11 +1382,11 @@ class CloneModeRadio(FileBackedRadio, ExternalMemoryProperties):
         return cls._memsize and len(filedata) == cls._memsize
 
     def sync_in(self):
-        "Initiate a radio-to-PC clone operation"
+        """Initiate a radio-to-PC clone operation"""
         pass
 
     def sync_out(self):
-        "Initiate a PC-to-radio clone operation"
+        """Initiate a PC-to-radio clone operation"""
         pass
 
     def save(self, filename):

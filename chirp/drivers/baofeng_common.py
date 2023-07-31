@@ -19,8 +19,8 @@
 import time
 import struct
 import logging
-from chirp import chirp_common, directory, memmap
-from chirp import bitwise, errors, util
+from chirp import chirp_common, memmap
+from chirp import errors, util
 from chirp import bandplan_na
 from chirp.settings import RadioSettingGroup, RadioSetting, \
     RadioSettingValueBoolean, RadioSettingValueList
@@ -65,7 +65,7 @@ def _rawsend(radio, data):
 
 
 def _make_frame(cmd, addr, length, data=""):
-    """Pack the info in the headder format"""
+    """Pack the info in the header format"""
     frame = struct.pack(">BHB", ord(cmd), addr, length)
     # add the data if set
     if len(data) != 0:
@@ -96,13 +96,35 @@ def _recv(radio, addr, length):
 
 
 def _get_radio_firmware_version(radio):
-    msg = struct.pack(">BHB", ord(b"S"), radio._fw_ver_start,
-                      radio._recv_block_size)
-    radio.pipe.write(msg)
-    block = _recv(radio, radio._fw_ver_start, radio._recv_block_size)
-    _rawsend(radio, b"\x06")
-    time.sleep(0.05)
-    version = block[0:16]
+    # There is a problem in new radios where a different firmware version is
+    # received when directly reading a single block as compared to what is
+    # received when reading sequential blocks. This causes a mismatch between
+    # the image firmware version and the radio firmware version when uploading
+    # an image that came from the same radio. The workaround is to read 1 or
+    # more consecutive blocks prior to reading the block with the firmware
+    # version.
+    #
+    # Read 2 consecutive blocks to get the radio firmware version.
+    for addr in range(0x1E80, 0x1F00, radio._recv_block_size):
+        frame = _make_frame("S", addr, radio._recv_block_size)
+
+        # sending the read request
+        _rawsend(radio, frame)
+
+        if radio._ack_block and addr != 0x1E80:
+            ack = _rawrecv(radio, 1)
+            if ack != b"\x06":
+                raise errors.RadioError(
+                    "Radio refused to send block 0x%04x" % addr)
+
+        # now we read
+        block = _recv(radio, addr, radio._recv_block_size)
+
+        _rawsend(radio, b"\x06")
+        time.sleep(0.05)
+
+    # get firmware version from the last block read
+    version = block[48:64]
     return version
 
 
@@ -344,7 +366,7 @@ class BaofengCommonHT(chirp_common.CloneModeRadio,
             _upload(self)
         except errors.RadioError:
             raise
-        except Exception as e:
+        except Exception:
             # If anything unexpected happens, make sure we raise
             # a RadioError and log the problem
             LOG.exception('Unexpected error during upload')
@@ -712,7 +734,7 @@ class BaofengCommonHT(chirp_common.CloneModeRadio,
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -728,6 +750,6 @@ class BaofengCommonHT(chirp_common.CloneModeRadio,
                 if self._bw_shift:
                     value = ((value & 0x00FF) << 8) | ((value & 0xFF00) >> 8)
                 self._memobj.fm_presets = value
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise

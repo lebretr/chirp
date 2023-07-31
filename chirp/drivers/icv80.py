@@ -16,11 +16,10 @@
 import logging
 
 from chirp.drivers import icf
-from chirp import chirp_common, memmap, bitwise, errors, directory
+from chirp import chirp_common, bitwise, errors, directory
 from chirp.settings import RadioSetting, RadioSettingGroup, \
-    RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, RadioSettings
+    RadioSettingValueList, RadioSettingValueBoolean, \
+    RadioSettings
 
 LOG = logging.getLogger(__name__)
 
@@ -372,7 +371,7 @@ class ICV80Radio(icf.IcomCloneModeRadio, chirp_common.ExperimentalRadio):
                     # This appears to need to be mirrored?
                     if element.get_name() == 'mem_display1':
                         _settings.mem_display2 = _settings.mem_display1
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 
@@ -473,7 +472,7 @@ class ICV80Radio(icf.IcomCloneModeRadio, chirp_common.ExperimentalRadio):
         _mem = self._memobj.memory[mem.number]
         _unused = self._memobj.unused[byte]
         _skip = (mem.extd_number == "") and self._memobj.skip[byte] or None
-        assert(_mem)
+        assert (_mem)
 
         if mem.empty:
             self._fill_memory(mem)
@@ -481,6 +480,8 @@ class ICV80Radio(icf.IcomCloneModeRadio, chirp_common.ExperimentalRadio):
             if _skip is not None:
                 _skip |= bit
             return
+
+        _mem.set_raw(b'\x00' * 15)
 
         if chirp_common.required_step(mem.freq) == 12.5:
             mult = 6250
@@ -510,6 +511,10 @@ class ICV80Radio(icf.IcomCloneModeRadio, chirp_common.ExperimentalRadio):
                 _skip |= bit
             else:
                 _skip &= ~bit
+
+        if mem.extra:
+            _mem.tx_inhibit = not mem.extra['tx_inhibit'].value
+            _mem.reverse_duplex = mem.extra['reverse_duplex'].value
 
     def get_raw_memory(self, number):
         return repr(self._memobj.memory[number])

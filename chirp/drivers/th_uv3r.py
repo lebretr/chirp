@@ -15,7 +15,6 @@
 
 """TYT uv3r radio management module"""
 
-import os
 import logging
 from chirp import chirp_common, bitwise, errors, directory
 from chirp.drivers.wouxun import do_download, do_upload
@@ -41,6 +40,7 @@ def tyt_uv3r_download(radio):
 def tyt_uv3r_upload(radio):
     tyt_uv3r_prep(radio)
     return do_upload(radio, 0x0000, 0x0910, 0x0010)
+
 
 mem_format = """
 struct memory {

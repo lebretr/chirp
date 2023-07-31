@@ -22,7 +22,6 @@ from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
     RadioSettingValueBoolean, RadioSettingValueString, \
     RadioSettings
-import os
 import logging
 from chirp.util import safe_charset_string
 
@@ -59,7 +58,7 @@ class FT857Radio(ft817.FT817Radio):
                                     list(CROSS_MODES.keys()))))
 
     _memsize = 7341
-    # block 9 (140 Bytes long) is to be repeted 40 times
+    # block 9 (140 Bytes long) is to be repeated 40 times
     # should be 42 times but this way I can use original 817 functions
     _block_lengths = [2, 82, 252, 196, 252, 196, 212, 55, 140, 140, 140,
                       38, 176]
@@ -485,7 +484,7 @@ class FT857Radio(ft817.FT817Radio):
         elif mem.tmode == "TSQL":
             mem.rtone = mem.ctone = chirp_common.TONES[_mem.tone]
         elif mem.tmode == "DTCS Enc":   # UI does not support it yet but
-                                        # this code has already been tested
+            # this code has already been tested
             mem.dtcs = mem.rx_dtcs = chirp_common.DTCS_CODES[_mem.dcs]
         elif mem.tmode == "DTCS":
             mem.dtcs = mem.rx_dtcs = chirp_common.DTCS_CODES[_mem.dcs]
@@ -512,7 +511,7 @@ class FT857Radio(ft817.FT817Radio):
         elif mem.tmode == "TSQL":
             _mem.tone = _mem.rxtone = chirp_common.TONES.index(mem.ctone)
         elif mem.tmode == "DTCS Enc":   # UI does not support it yet but
-                                        # this code has already been tested
+            # this code has already been tested
             _mem.dcs = _mem.rxdcs = chirp_common.DTCS_CODES.index(mem.dtcs)
         elif mem.tmode == "DTCS":
             _mem.dcs = _mem.rxdcs = chirp_common.DTCS_CODES.index(mem.rx_dtcs)
@@ -693,7 +692,7 @@ class FT857Radio(ft817.FT817Radio):
                                                 options[_settings.cw_speed]))
         cw.append(rs)
         options = ["Numeric", "Alphabet", "AlphaNumeric"]
-        rs = RadioSetting("cw_training", "CW trainig",
+        rs = RadioSetting("cw_training", "CW training",
                           RadioSettingValueList(options,
                                                 options[_settings.cw_training])
                           )
@@ -1102,7 +1101,7 @@ class FT857Radio(ft817.FT817Radio):
                     setattr(self._memobj, setting + "_offset", abs(val))
                 else:
                     setattr(obj, setting, element.value)
-            except:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 
@@ -1117,7 +1116,7 @@ class FT857USRadio(FT857Radio):
     _model = ""
     _US_model = True
     _memsize = 7481
-    # block 9 (140 Bytes long) is to be repeted 40 times
+    # block 9 (140 Bytes long) is to be repeated 40 times
     # should be 42 times but this way I can use original 817 functions
     _block_lengths = [2, 82, 252, 196, 252, 196, 212, 55, 140, 140, 140, 38,
                       176, 140]

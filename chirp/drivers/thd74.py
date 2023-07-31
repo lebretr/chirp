@@ -176,7 +176,8 @@ def get_used_flag(mem):
 
 
 @directory.register
-class THD74Radio(chirp_common.CloneModeRadio):
+class THD74Radio(chirp_common.CloneModeRadio,
+                 chirp_common.IcomDstarSupport):
     VENDOR = "Kenwood"
     MODEL = "TH-D74 (clone mode)"
     NEEDS_COMPAT_SERIAL = False
@@ -375,7 +376,7 @@ class THD74Radio(chirp_common.CloneModeRadio):
         return rf
 
     def _get_raw_memory(self, number):
-        # Why kenwood ... WHY?
+        # Why Kenwood ... WHY?
         return self._memobj.memgroups[number // 6].memories[number % 6]
 
     def get_memory(self, number):

@@ -13,9 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import struct
-import time
 import logging
 import string
 
@@ -28,11 +26,11 @@ from chirp import util
 from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
     RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, InvalidValueError, RadioSettings
+    RadioSettingValueFloat, RadioSettings
 
 
 class ATBankModel(chirp_common.BankModel):
-    """Anytone Banks A-J, Each chan in zero or one bank"""
+    """AnyTone Banks A-J, Each chan in zero or one bank"""
 
     def __init__(self, radio, name='Banks'):
         super(ATBankModel, self).__init__(radio, name)
@@ -538,6 +536,7 @@ def _read(radio, length):
         LOG.debug(util.hexprint(data))
         raise errors.RadioError("Short read from radio")
     return data
+
 
 valid_model = [b'I588UVP']
 

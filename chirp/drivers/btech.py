@@ -18,7 +18,6 @@
 from builtins import bytes
 
 import struct
-import time
 import logging
 
 from time import sleep
@@ -194,8 +193,14 @@ UV5001G3_fp = b"BTG304"
 # B-TECH UV-25X2
 UV25X2_fp = b"UC2012"
 
+# B-TECH UV-25X2 Second Generation (G2)
+UV25X2G2_fp = b"UCB282"
+
 # B-TECH UV-25X4
 UV25X4_fp = b"UC4014"
+
+# B-TECH UV-25X4 Second Generation (G2)
+UV25X4G2_fp = b"UCB284"
 
 # B-TECH UV-50X2
 UV50X2_fp = b"UC2M12"
@@ -389,7 +394,7 @@ def _send(radio, data):
 
 
 def _make_frame(cmd, addr, length, data=""):
-    """Pack the info in the headder format"""
+    """Pack the info in the header format"""
     frame = b"\x06" + struct.pack(">BHB", ord(cmd), addr, length)
     # add the data if set
     if len(data) != 0:
@@ -556,7 +561,7 @@ def _upload(radio):
     """Upload procedure"""
 
     # The UPLOAD mem is restricted to lower than 0x3100,
-    # so we will override that here localy
+    # so we will override that here locally
     MEM_SIZE = radio.UPLOAD_MEM_SIZE
 
     # UI progress
@@ -618,7 +623,7 @@ def model_match(cls, data):
 
 def _decode_ranges(low, high):
     """Unpack the data in the ranges zones in the memmap and return
-    a tuple with the integer corresponding to the Mhz it means"""
+    a tuple with the integer corresponding to the MHz it means"""
     ilow = int(low[0]) * 100 + int(low[1]) * 10 + int(low[2])
     ihigh = int(high[0]) * 100 + int(high[1]) * 10 + int(high[2])
     ilow *= 1000000
@@ -803,7 +808,7 @@ class BTechMobileCommon(chirp_common.CloneModeRadio,
                     index += 0x6A
                 memval.set_value(index)
             except:
-                msg = "Digital Tone '%d' is not supported" % value
+                msg = "Digital Tone '%d' is not supported" % val
                 LOG.error(msg)
                 raise errors.RadioError(msg)
         else:
@@ -1041,10 +1046,7 @@ class BTechMobileCommon(chirp_common.CloneModeRadio,
         self._encode_tone(_mem.rxtone, rxmode, rxtone, rxpol)
 
         # name TAG of the channel
-        if len(mem.name) < self.NAME_LENGTH:
-            # we must pad to self.NAME_LENGTH chars, " " = "\xFF"
-            mem.name = str(mem.name).ljust(self.NAME_LENGTH, " ")
-        _names.name = str(mem.name).replace(" ", "\xFF")
+        _names.name = mem.name.rstrip(' ').ljust(self.NAME_LENGTH, "\xFF")
 
         # power, # default power level is high
         _mem.power = 0 if mem.power is None else POWER_LEVELS.index(mem.power)
@@ -1090,7 +1092,7 @@ class BTechMobileCommon(chirp_common.CloneModeRadio,
                 LOG.debug("New mem is empty.")
             else:
                 LOG.debug("New mem is NOT empty")
-                # set extra-settings to default ONLY when apreviously empty or
+                # set extra-settings to default ONLY when a previously empty or
                 # deleted memory was edited to prevent errors such as #4121
                 if mem_was_empty:
                     LOG.debug("old mem was empty. Setting default for extras.")
@@ -1140,9 +1142,9 @@ class BTechMobileCommon(chirp_common.CloneModeRadio,
         basic.append(tot)
 
         if self.MODEL == "KT-8R":
-                rs = RadioSettingValueBoolean(_mem.settings.save)
-                save = RadioSetting("settings.save", "Battery Save", rs)
-                basic.append(save)
+            rs = RadioSettingValueBoolean(_mem.settings.save)
+            save = RadioSetting("settings.save", "Battery Save", rs)
+            basic.append(save)
 
         model_list = ["KT-8R", "KT-WP12", "WP-9900"]
         if self.MODEL not in model_list:
@@ -1262,7 +1264,7 @@ class BTechMobileCommon(chirp_common.CloneModeRadio,
                 cdmdf = RadioSetting("settings.cdmdf", "Display mode D", rs)
                 basic.append(cdmdf)
 
-                if self.MODEL == "UV-50X2_G2":
+                if self.MODEL in ["UV-50X2_G2", "UV-25X2_G2", "UV-25X4_G2"]:
                     val = min(_mem.settings.langua, len(LIST_VOX) - 1)
                     rs = RadioSettingValueList(LIST_VOX, LIST_VOX[val])
                     vox = RadioSetting("settings.langua", "VOX", rs)
@@ -1645,16 +1647,16 @@ class BTechMobileCommon(chirp_common.CloneModeRadio,
             scmode = RadioSetting("settings.scmode", "Scan mode", rs)
             basic.append(scmode)
 
-        if self.MODEL == "KT-8R" or self.MODEL == "UV-25X2" \
-                or self.MODEL == "UV-25X4" or self.MODEL == "UV-50X2" \
-                or self.MODEL == "GMRS-50X1" or self.MODEL == "GMRS-20V2" \
-                or self.MODEL == "UV-50X2_G2" or self.MODEL == "GMRS-50V2":
+        if self.MODEL in ["KT-8R", "UV-25X2", "UV-25X4", "UV-50X2",
+                          "GMRS-50X1", "GMRS-20V2", "UV-50X2_G2",
+                          "GMRS-50V2", "UV-25X2_G2", "UV-25X4_G2"]:
             val = min(_mem.settings.tmrtx, len(LIST_TMRTX) - 1)
             rs = RadioSettingValueList(LIST_TMRTX, LIST_TMRTX[val])
             tmrtx = RadioSetting("settings.tmrtx", "TX in multi-standby", rs)
             basic.append(tmrtx)
 
-        if self.MODEL == "UV-50X2_G2" or self.MODEL == "GMRS-50V2":
+        if self.MODEL in ["UV-50X2_G2", "GMRS-50V2", "UV-25X2_G2",
+                          "UV-25X4_G2"]:
             val = min(_mem.settings.earpho, len(LIST_EARPH) - 1)
             rs = RadioSettingValueList(LIST_EARPH, LIST_EARPH[val])
             earpho = RadioSetting("settings.earpho", "Earphone", rs)
@@ -3118,7 +3120,7 @@ class BTechMobileCommon(chirp_common.CloneModeRadio,
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -3461,7 +3463,7 @@ class BTech(BTechMobileCommon):
         LOG.info("Radio ranges: VHF %d to %d" % vhf)
         LOG.info("Radio ranges: UHF %d to %d" % uhf)
 
-        # 220Mhz radios case
+        # 220MHz radios case
         if self.MODEL in ["UV-2501+220", "KT8900R"]:
             vhf2 = _decode_ranges(ranges.vhf2_low, ranges.vhf2_high)
             LOG.info("Radio ranges: VHF(220) %d to %d" % vhf2)
@@ -3549,9 +3551,9 @@ class MINI8900(BTech):
     VENDOR = "WACCOM"
     MODEL = "MINI-8900"
     _magic = MSTRING_MINI8900
-    _fileid = [MINI8900_fp, ]
+    _fileid = [MINI8900_fp]
     # Clones
-    ALIASES = [JT6188Plus, ]
+    ALIASES = [JT6188Plus]
 
 
 @directory.register
@@ -3562,9 +3564,9 @@ class KTUV980(BTech):
     _vhf_range = (136000000, 175000000)
     _uhf_range = (400000000, 481000000)
     _magic = MSTRING_MINI8900
-    _fileid = [KTUV980_fp, ]
+    _fileid = [KTUV980_fp]
     # Clones
-    ALIASES = [JT2705M, ]
+    ALIASES = [JT2705M]
 
 # Please note that there is a version of this radios that is a clone of the
 # Waccom Mini8900, maybe an early version?
@@ -3968,12 +3970,12 @@ class BTechColor(BTechMobileCommon):
 
         # the additional bands
         if self.MODEL in ["UV-25X4", "KT7900D"]:
-            # 200Mhz band
+            # 200MHz band
             vhf2 = _decode_ranges(ranges.vhf2_low, ranges.vhf2_high)
             LOG.info("Radio ranges: VHF(220) %d to %d" % vhf2)
             self._220_range = vhf2
 
-            # 350Mhz band
+            # 350MHz band
             uhf2 = _decode_ranges(ranges.uhf2_low, ranges.uhf2_high)
             LOG.info("Radio ranges: UHF(350) %d to %d" % uhf2)
             self._350_range = uhf2
@@ -4003,7 +4005,14 @@ class UV25X2(BTechColor):
     _vhf_range = (130000000, 180000000)
     _uhf_range = (400000000, 521000000)
     _magic = MSTRING_UV25X2
-    _fileid = [UV25X2_fp, ]
+    _fileid = [UV25X2_fp]
+
+
+@directory.register
+class UV25X2_G2(UV25X2):
+    """Baofeng Tech UV25X2_G2"""
+    MODEL = "UV-25X2_G2"
+    _fileid = [UV25X2G2_fp]
 
 
 @directory.register
@@ -4016,7 +4025,14 @@ class UV25X4(BTechColor):
     _uhf_range = (400000000, 521000000)
     _350_range = (350000000, 391000000)
     _magic = MSTRING_UV25X4
-    _fileid = [UV25X4_fp, ]
+    _fileid = [UV25X4_fp]
+
+
+@directory.register
+class UV25X4_G2(UV25X4):
+    """Baofeng Tech UV25X4_G2"""
+    MODEL = "UV-25X4_G2"
+    _fileid = [UV25X4G2_fp]
 
 
 @directory.register
@@ -4027,7 +4043,7 @@ class UV50X2(BTechColor):
     _vhf_range = (130000000, 180000000)
     _uhf_range = (400000000, 521000000)
     _magic = MSTRING_UV25X2
-    _fileid = [UV50X2_fp, ]
+    _fileid = [UV50X2_fp]
     _power_levels = [chirp_common.PowerLevel("High", watts=50),
                      chirp_common.PowerLevel("Low", watts=10)]
 
@@ -4040,7 +4056,7 @@ class UV50X2_G2(BTechColor):
     _vhf_range = (130000000, 180000000)
     _uhf_range = (400000000, 521000000)
     _magic = MSTRING_UV25X2
-    _fileid = [UV50X2_fp, ]
+    _fileid = [UV50X2_fp]
     _power_levels = [chirp_common.PowerLevel("High", watts=50),
                      chirp_common.PowerLevel("Low", watts=10)]
 
@@ -4064,9 +4080,9 @@ class KT7900D(BTechColor):
     _magic = MSTRING_KT8900D
     _fileid = [KT7900D_fp, KT7900D_fp1, KT7900D_fp2, KT7900D_fp3, KT7900D_fp4,
                KT7900D_fp5, KT7900D_fp6, KT7900D_fp7, KT7900D_fp8, KT7900D_fp9,
-               QB25_fp, ]
+               QB25_fp]
     # Clones
-    ALIASES = [SKT8900D, QB25, ]
+    ALIASES = [SKT8900D, QB25]
 
 
 @directory.register
@@ -4095,7 +4111,7 @@ class KT5800(BTechColor):
     _vhf_range = (136000000, 175000000)
     _uhf_range = (400000000, 481000000)
     _magic = MSTRING_KT8900D
-    _fileid = [KT5800_fp, ]
+    _fileid = [KT5800_fp]
 
 
 @directory.register
@@ -4520,7 +4536,7 @@ class GMRS50X1(BTechGMRS):
     _uhf_range = (400000000, 521000000)
     _upper = 255
     _magic = MSTRING_GMRS50X1
-    _fileid = [GMRS50X1_fp1, GMRS50X1_fp, ]
+    _fileid = [GMRS50X1_fp1, GMRS50X1_fp]
     _gmrs = True
 
     def validate_memory(self, mem):
@@ -4554,7 +4570,7 @@ class GMRS50V2(BTechGMRS):
     _uhf_range = (400000000, 521000000)
     _upper = 255
     _magic = MSTRING_GMRS50X1
-    _fileid = [GMRS50X1_fp1, GMRS50X1_fp, ]
+    _fileid = [GMRS50X1_fp1, GMRS50X1_fp]
     _gmrs = True
 
     def validate_memory(self, mem):
@@ -4917,12 +4933,12 @@ class QYTColorHT(BTechMobileCommon):
 
         # the additional bands
         if self.MODEL in ["KT-8R"]:
-            # 200Mhz band
+            # 200MHz band
             vhf2 = _decode_ranges(ranges.vhf2_low, ranges.vhf2_high)
             LOG.info("Radio ranges: VHF(220) %d to %d" % vhf2)
             self._220_range = vhf2
 
-            # 350Mhz band
+            # 350MHz band
             uhf2 = _decode_ranges(ranges.uhf2_low, ranges.uhf2_high)
             LOG.info("Radio ranges: UHF(350) %d to %d" % uhf2)
             self._350_range = uhf2
@@ -4945,7 +4961,7 @@ class KT8R(QYTColorHT):
     _uhf_range = (400000000, 481000000)
     _350_range = (350000000, 391000000)
     _magic = MSTRING_KT8R
-    _fileid = [KT8R_fp2, KT8R_fp1, KT8R_fp, ]
+    _fileid = [KT8R_fp2, KT8R_fp1, KT8R_fp]
     _power_levels = [chirp_common.PowerLevel("High", watts=5),
                      chirp_common.PowerLevel("Low", watts=1)]
 
@@ -5621,7 +5637,7 @@ class KTWP12(BTechColorWP):
                      chirp_common.PowerLevel("Low", watts=5)]
     _upper = 199
     _magic = MSTRING_KTWP12
-    _fileid = [KTWP12_fp, ]
+    _fileid = [KTWP12_fp]
     _gmrs = False
 
     def process_mmap(self):
@@ -5645,7 +5661,7 @@ class WP9900(BTechColorWP):
                      chirp_common.PowerLevel("Low", watts=5)]
     _upper = 199
     _magic = MSTRING_KTWP12
-    _fileid = [WP9900_fp, ]
+    _fileid = [WP9900_fp]
     _gmrs = False
 
     def process_mmap(self):
@@ -5669,7 +5685,7 @@ class GMRS20V2(BTechColorWP):
                      chirp_common.PowerLevel("Low", watts=5)]
     _upper = 199
     _magic = MSTRING_GMRS20V2
-    _fileid = [GMRS20V2_fp2, GMRS20V2_fp1, GMRS20V2_fp, ]
+    _fileid = [GMRS20V2_fp2, GMRS20V2_fp1, GMRS20V2_fp]
     _gmrs = True
 
     def validate_memory(self, mem):

@@ -251,6 +251,7 @@ def do_upload(radio):
         LOG.debug("Radio ACK'd block at address 0x%04x" % i)
         do_status(radio, "to", i)
 
+
 DUPLEX = ["", "-", "+"]
 UVB5_STEPS = [5.00, 6.25, 10.0, 12.5, 20.0, 25.0]
 CHARSET = "0123456789- ABCDEFGHIJKLMNOPQRSTUVWXYZ/_+*"
@@ -703,7 +704,7 @@ class BaofengUVB5(chirp_common.CloneModeRadio,
         for power in range(0, 2):
             for index in range(0, 8):
                 key = "test.vhf%s%i" % (powerkeydata[power], index)
-                name = "%s Mhz %s Power" % (vhfdata[index],
+                name = "%s MHz %s Power" % (vhfdata[index],
                                             powernamedata[power])
                 rs = RadioSetting(
                         key, name, RadioSettingValueInteger(
@@ -715,7 +716,7 @@ class BaofengUVB5(chirp_common.CloneModeRadio,
         for power in range(0, 2):
             for index in range(0, 8):
                 key = "test.uhf%s%i" % (powerkeydata[power], index)
-                name = "%s Mhz %s Power" % (uhfdata[index],
+                name = "%s MHz %s Power" % (uhfdata[index],
                                             powernamedata[power])
                 rs = RadioSetting(
                         key, name, RadioSettingValueInteger(
@@ -774,7 +775,7 @@ class BaofengUVB5(chirp_common.CloneModeRadio,
                     else:
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -790,7 +791,7 @@ class BaofengUVB5(chirp_common.CloneModeRadio,
                 LOG.debug("Setting fm_presets[%1i] = %s" % (index, value))
                 setting = self._memobj.fm_presets
                 setting[index] = value
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 

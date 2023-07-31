@@ -15,6 +15,8 @@
 
 import functools
 import logging
+import os
+import platform
 import threading
 
 import wx
@@ -23,9 +25,11 @@ from chirp import chirp_common
 from chirp.drivers import generic_csv
 from chirp import errors
 from chirp import settings
+from chirp.wxui import config
 from chirp.wxui import radiothread
 
 LOG = logging.getLogger(__name__)
+CONF = config.get()
 
 CHIRP_DATA_MEMORY = wx.DataFormat('x-chirp/memory-channel')
 EditorChanged, EVT_EDITOR_CHANGED = wx.lib.newevent.NewCommandEvent()
@@ -39,6 +43,18 @@ INDEX_CHAR = settings.BANNED_NAME_CHARACTERS[0]
 # global is technically too broad, but in reality, it's equivalent for
 # us at the moment, and this is easier.
 EDIT_LOCK = threading.Lock()
+
+
+def closes_clipboard(fn):
+    @functools.wraps(fn)
+    def wrapper(*a, **k):
+        try:
+            return fn(*a, **k)
+        finally:
+            if wx.TheClipboard.IsOpened():
+                LOG.warning('Closing clipboard left open by %s' % fn)
+                wx.TheClipboard.Close()
+    return wrapper
 
 
 class LiveAdapter(generic_csv.CSVRadio):
@@ -101,11 +117,63 @@ class LiveAdapter(generic_csv.CSVRadio):
         return self._liveradio.set_settings(settings)
 
 
+class EditorMenuItem(wx.MenuItem):
+    MENU_VIEW = 'View'
+    MENU_EDIT = 'Edit'
+    ITEMS = {}
+
+    def __init__(self, cls, callback_name, *a, **k):
+        self._wx_id = wx.NewId()
+        super().__init__(None, self._wx_id, *a, **k)
+        self._cls = cls
+        self._callback_name = callback_name
+        self.ITEMS[self.key] = self._wx_id
+
+    @property
+    def key(self):
+        return '%s:%s' % (self._cls.__name__, self._callback_name)
+
+    @property
+    def editor_class(self):
+        return self._cls
+
+    def editor_callback(self, editor, event):
+        getattr(editor, self._callback_name)(event)
+
+    def add_menu_callback(self):
+        # Some platforms won't actually set the accelerator (macOS) or allow
+        # enable/check (linux) before we are in a menu.
+        accel = self.GetAccel()
+        self.SetAccel(None)
+        self.SetAccel(accel)
+
+
+class EditorMenuItemToggle(EditorMenuItem):
+    """An EditorMenuItem that manages boolean/check state in CONF"""
+    def __init__(self, cls, callback_name, conf_tuple, *a, **k):
+        k['kind'] = wx.ITEM_CHECK
+        super().__init__(cls, callback_name, *a, **k)
+        self._conf_key, self._conf_section = conf_tuple
+
+    def editor_callback(self, editor, event):
+        menuitem = event.GetEventObject().FindItemById(event.GetId())
+        CONF.set_bool(self._conf_key, menuitem.IsChecked(), self._conf_section)
+        super().editor_callback(editor, event)
+
+    def add_menu_callback(self):
+        super().add_menu_callback()
+        self.Check(CONF.get_bool(self._conf_key, self._conf_section, False))
+
+
 class ChirpEditor(wx.Panel):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         self.setup_radio_interface()
         self.wait_dialog = None
+
+    @property
+    def radio(self):
+        return self._radio
 
     def start_wait_dialog(self, message):
         if self.wait_dialog:
@@ -137,15 +205,30 @@ class ChirpEditor(wx.Panel):
         pass
 
     def cb_copy(self, cut=False):
-        pass
+        raise NotImplementedError()
 
-    def cb_paste(self, data):
-        pass
+    @closes_clipboard
+    def cb_copy_data(self, data):
+        if wx.TheClipboard.Open():
+            wx.TheClipboard.SetData(data)
+            wx.TheClipboard.Close()
+        else:
+            raise RuntimeError(_('Unable to open the clipboard'))
+
+    @closes_clipboard
+    def cb_paste(self):
+        memdata = wx.CustomDataObject(CHIRP_DATA_MEMORY)
+        textdata = wx.TextDataObject()
+        if wx.TheClipboard.Open():
+            gotchirpmem = wx.TheClipboard.GetData(memdata)
+            got = wx.TheClipboard.GetData(textdata)
+            wx.TheClipboard.Close()
+        if gotchirpmem:
+            return memdata
+        elif got:
+            return textdata
 
     def cb_delete(self):
-        pass
-
-    def cb_goto(self, number):
         pass
 
     def cb_find(self, text):
@@ -169,6 +252,14 @@ class ChirpEditor(wx.Panel):
 
     def update_font(self):
         pass
+
+    @classmethod
+    def get_menu_items(self):
+        """Return a dict of menu items specific to this editor class
+
+        Example: {'Edit': [wx.MenuItem], 'View': [wx.MenuItem]}
+        """
+        return {}
 
 
 class ChirpSyncEditor:
@@ -258,6 +349,7 @@ class ChirpSettingGrid(wx.Panel):
     def __init__(self, settinggroup, *a, **k):
         super(ChirpSettingGrid, self).__init__(*a, **k)
         self._group = settinggroup
+        self._needs_reload = False
 
         self.pg = wx.propgrid.PropertyGrid(
             self,
@@ -295,16 +387,50 @@ class ChirpSettingGrid(wx.Panel):
                 else:
                     LOG.warning('Unsupported setting type %r' % value)
                     editor = None
-                if editor:
-                    editor.SetName('%s%s%i' % (name, INDEX_CHAR, i))
-                    if len(element.keys()) > 1:
-                        editor.SetLabel('')
-                    editor.Enable(value.get_mutable())
-                    self.pg.Append(editor)
+                if not editor:
+                    continue
+
+                editor.SetName('%s%s%i' % (name, INDEX_CHAR, i))
+                if len(element.keys()) > 1:
+                    editor.SetLabel('')
+                editor.Enable(value.get_mutable())
+                self.pg.Append(editor)
+
+                # Use object() as a sentinel that will never match the safe
+                # value to determine if we need to catch changes for this to
+                # check for a warning.
+                if element.get_warning(object()) or element.volatile:
+                    self.pg.Bind(wx.propgrid.EVT_PG_CHANGING,
+                                 lambda evt: self._check_change(evt, element))
+
+    def _check_change(self, event, setting):
+        warning = setting.get_warning(event.GetValue())
+        if warning:
+            r = wx.MessageBox(warning, _('WARNING!'),
+                              wx.OK | wx.CANCEL | wx.CANCEL_DEFAULT)
+            if r == wx.CANCEL:
+                LOG.info('User aborted setting %s=%s with warning message',
+                         event.GetPropertyName(), event.GetValue())
+                event.SetValidationFailureBehavior(0)
+                event.Veto()
+                return
+            else:
+                LOG.info('User made change to %s=%s despite warning',
+                         event.GetPropertyName(), event.GetValue())
+        self._needs_reload = setting.volatile
+        if self.needs_reload:
+            wx.MessageBox(_(
+                'Changing this setting requires refreshing the settings from '
+                'the image, which will happen now.'),
+                          _('Refresh required'), wx.OK)
 
     @property
     def name(self):
         return self._group.get_name()
+
+    @property
+    def needs_reload(self):
+        return self._needs_reload
 
     @property
     def propgrid(self):
@@ -425,18 +551,6 @@ def _error_proof(*expected_errors):
     return wrap
 
 
-def closes_clipboard(fn):
-    @functools.wraps(fn)
-    def wrapper(*a, **k):
-        try:
-            return fn(*a, **k)
-        finally:
-            if wx.TheClipboard.IsOpened():
-                LOG.warning('Closing clipboard left open by %s' % fn)
-                wx.TheClipboard.Close()
-    return wrapper
-
-
 class error_proof(object):
     def __init__(self, *expected_exceptions):
         self._expected = expected_exceptions
@@ -478,3 +592,15 @@ class error_proof(object):
                 LOG.exception('Context raised unexpected_exception',
                               exc_info=(exc_type, exc_val, traceback))
                 self.show_error(exc_val)
+
+
+def reveal_location(path):
+    if not os.path.isdir(path):
+        raise FileNotFoundError(_('Path %s does not exist') % path)
+    system = platform.system()
+    if system == 'Windows':
+        wx.Execute('explorer /select, %s' % path)
+    elif system == 'Darwin':
+        wx.Execute('open -R %s' % path)
+    else:
+        raise Exception(_('Unable to reveal %s on this system') % path)

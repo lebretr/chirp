@@ -17,10 +17,6 @@
 """Baojie BJ-9900 management module"""
 
 from chirp import chirp_common, util, memmap, errors, directory, bitwise
-from chirp.settings import RadioSetting, RadioSettingGroup, \
-    RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettings
 import struct
 import time
 import logging
@@ -29,9 +25,10 @@ LOG = logging.getLogger(__name__)
 
 CMD_ACK = 0x06
 
+
 @directory.register
 class BJ9900Radio(chirp_common.CloneModeRadio,
-        chirp_common.ExperimentalRadio):
+                  chirp_common.ExperimentalRadio):
     """Baojie BJ-9900"""
     VENDOR = "Baojie"
     MODEL = "BJ-9900"
@@ -42,10 +39,10 @@ class BJ9900Radio(chirp_common.CloneModeRadio,
     MODES = ["NFM", "FM"]
     TMODES = ["", "Tone", "TSQL", "DTCS", "Cross"]
     CROSS_MODES = ["Tone->Tone", "Tone->DTCS", "DTCS->Tone",
-        "->Tone", "->DTCS", "DTCS->", "DTCS->DTCS"]
+                   "->Tone", "->DTCS", "DTCS->", "DTCS->DTCS"]
     STEPS = [5.0, 6.25, 10.0, 12.5, 25.0]
     VALID_BANDS = [(109000000, 136000000), (136000000, 174000000),
-        (400000000, 470000000)]
+                   (400000000, 470000000)]
 
     CHARSET = list(chirp_common.CHARSET_ALPHANUMERIC)
     CHARSET.remove(" ")
@@ -255,7 +252,7 @@ class BJ9900Radio(chirp_common.CloneModeRadio,
 
         _mem.namelen = len(mem.name)
         for i in range(_mem.namelen):
-                _mem.name[i] = ord(mem.name[i])
+            _mem.name[i] = ord(mem.name[i])
 
         rxmode = ""
         txmode = ""
@@ -393,6 +390,7 @@ class BJ9900Radio(chirp_common.CloneModeRadio,
     def match_model(cls, filedata, filename):
         return len(filedata) == cls._memsize or \
             (len(filedata) == cls._datsize and filedata[-4:] == "\r\n\r\n")
+
 
 class BJ9900RadioLeft(BJ9900Radio):
     """Baojie BJ-9900 Left VFO subdevice"""

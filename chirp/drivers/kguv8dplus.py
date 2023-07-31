@@ -266,7 +266,7 @@ _MEM_FORMAT = """
     #seekto 0x4780;
     struct {
         u8    name[8];
-		u8    unknown[4];
+        u8    unknown[4];
     } names[1000];
 
     #seekto 0x7670;
@@ -292,9 +292,10 @@ _MEM_FORMAT = """
 # the maximum payload size (from the Wouxun software) seems to be 66 bytes
 #  (2 bytes location + 64 bytes data).
 
+
 @directory.register
 class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
-                  chirp_common.ExperimentalRadio):
+                      chirp_common.ExperimentalRadio):
 
     """Wouxun KG-UV8D Plus"""
     VENDOR = "Wouxun"
@@ -376,7 +377,9 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
 #
     @classmethod
     def match_model(cls, filedata, filename):
-        return cls._file_ident in b'kg' + filedata[0x426:0x430].replace(b'(', b'').replace(b')', b'').lower()
+        return (cls._file_ident in b'kg' +
+                filedata[0x426:0x430].replace(b'(', b'').replace(b')',
+                                                                 b'').lower())
 
     def _identify(self):
         """Do the identification dance"""
@@ -418,7 +421,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
     # It would be smarter to only load the active areas and none of
     # the padding/unused areas. Padding still need to be investigated.
     def _download(self):
-        """Talk to a wouxun KG-UV8D Plus and do a download"""
+        """Talk to a Wouxun KG-UV8D Plus and do a download"""
         try:
             self._identify()
             return self._do_download(0, 32768, 64)
@@ -450,7 +453,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
         return memmap.MemoryMapBytes(image)
 
     def _upload(self):
-        """Talk to a wouxun KG-UV8D Plus and do a upload"""
+        """Talk to a Wouxun KG-UV8D Plus and do a upload"""
         try:
             self._identify()
             self._do_upload(0, 32768, 64)
@@ -506,7 +509,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
         rf.valid_name_length = 8
         rf.valid_duplexes = ["", "-", "+", "split", "off"]
         rf.valid_bands = [(134000000, 175000000),  # supports 2m
-                          (400000000, 520000000)]  # supports 70cm
+                          (300000000, 520000000)]  # supports 70cm
         rf.valid_characters = chirp_common.CHARSET_ASCII
         rf.valid_tuning_steps = STEPS
         rf.memory_bounds = (1, 999)  # 999 memories
@@ -526,11 +529,11 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
     def _get_tone(self, _mem, mem):
         def _get_dcs(val):
             code = int("%03o" % (val & 0x07FF))
-            pol = (val & 0x8000) and "R" or "N"
+            pol = (val & 0x2000) and "R" or "N"
             return code, pol
 
         tpol = False
-        if _mem.txtone != 0xFFFF and (_mem.txtone & 0x2800) == 0x2800:
+        if _mem.txtone != 0xFFFF and (_mem.txtone & 0x4000) == 0x4000:
             tcode, tpol = _get_dcs(_mem.txtone)
             mem.dtcs = tcode
             txmode = "DTCS"
@@ -541,7 +544,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
             txmode = ""
 
         rpol = False
-        if _mem.rxtone != 0xFFFF and (_mem.rxtone & 0x2800) == 0x2800:
+        if _mem.rxtone != 0xFFFF and (_mem.rxtone & 0x4000) == 0x4000:
             rcode, rpol = _get_dcs(_mem.rxtone)
             mem.rx_dtcs = rcode
             rxmode = "DTCS"
@@ -612,9 +615,9 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
 
     def _set_tone(self, mem, _mem):
         def _set_dcs(code, pol):
-            val = int("%i" % code, 8) + 0x2800
+            val = int("%i" % code, 8) + 0x4000
             if pol == "R":
-                val += 0x8000
+                val += 0x2000
             return val
 
         rx_mode = tx_mode = None
@@ -709,8 +712,8 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
         vhf_lmt_grp = RadioSettingGroup("vhf_lmt_grp", "VHF")
         oem_grp = RadioSettingGroup("oem_grp", "OEM Info")
 
-        lmt_grp.append(uhf_lmt_grp);
-        lmt_grp.append(vhf_lmt_grp);
+        lmt_grp.append(uhf_lmt_grp)
+        lmt_grp.append(vhf_lmt_grp)
         group = RadioSettings(cfg_grp, vfoa_grp, vfob_grp,
                               key_grp, lmt_grp, oem_grp)
 
@@ -740,8 +743,9 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
                           RadioSettingValueInteger(0, 10, _settings.toalarm))
         cfg_grp.append(rs)
         rs = RadioSetting("roger_beep", "Roger Beep",
-                          RadioSettingValueList(ROGER_LIST, 
-                                                ROGER_LIST[_settings.roger_beep]))
+                          RadioSettingValueList(ROGER_LIST,
+                                                ROGER_LIST[
+                                                    _settings.roger_beep]))
         cfg_grp.append(rs)
         rs = RadioSetting("power_save", "Power save",
                           RadioSettingValueBoolean(_settings.power_save))
@@ -844,12 +848,13 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
                                                 SMUTESET_LIST[_settings.
                                                               smuteset]))
         cfg_grp.append(rs)
-        
-		#
+
         # VFO A Settings
         #
         rs = RadioSetting("workmode_a", "VFO A Workmode",
-                          RadioSettingValueList(WORKMODE_LIST, WORKMODE_LIST[_settings.workmode_a]))
+                          RadioSettingValueList(WORKMODE_LIST,
+                                                WORKMODE_LIST[
+                                                    _settings.workmode_a]))
         vfoa_grp.append(rs)
         rs = RadioSetting("work_cha", "VFO A Channel",
                           RadioSettingValueInteger(1, 999, _settings.work_cha))
@@ -888,12 +893,13 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
         rs = RadioSetting("bcl_a", "Busy Channel Lock-out A",
                           RadioSettingValueBoolean(_settings.bcl_a))
         vfoa_grp.append(rs)
-        
-		#
+
         # VFO B Settings
         #
         rs = RadioSetting("workmode_b", "VFO B Workmode",
-                          RadioSettingValueList(WORKMODE_LIST, WORKMODE_LIST[_settings.workmode_b]))
+                          RadioSettingValueList(WORKMODE_LIST,
+                                                WORKMODE_LIST[
+                                                    _settings.workmode_b]))
         vfob_grp.append(rs)
         rs = RadioSetting("work_chb", "VFO B Channel",
                           RadioSettingValueInteger(1, 999, _settings.work_chb))
@@ -932,8 +938,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
         rs = RadioSetting("bcl_b", "Busy Channel Lock-out B",
                           RadioSettingValueBoolean(_settings.bcl_b))
         vfob_grp.append(rs)
-        
-		#
+
         # Key Settings
         #
         _msg = str(_settings.dispstr).split("\0")[0]
@@ -948,6 +953,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
         val = RadioSettingValueString(3, 6, _code, False)
         val.set_charset(dtmfchars)
         rs = RadioSetting("ani_code", "ANI Code", val)
+
         def apply_ani_id(setting, obj):
             value = []
             for j in range(0, 6):
@@ -975,12 +981,12 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
         #
         rs = RadioSetting("uhf_limits.rx_start", "UHF RX Lower Limit",
                           RadioSettingValueInteger(
-                              400000000, 520000000,
+                              300000000, 520000000,
                               self._memobj.uhf_limits.rx_start * 10, 5000))
         uhf_lmt_grp.append(rs)
         rs = RadioSetting("uhf_limits.rx_stop", "UHF RX Upper Limit",
                           RadioSettingValueInteger(
-                              400000000, 520000000,
+                              300000000, 520000000,
                               self._memobj.uhf_limits.rx_stop * 10, 5000))
         uhf_lmt_grp.append(rs)
         rs = RadioSetting("uhf_limits.tx_start", "UHF TX Lower Limit",
@@ -1061,7 +1067,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
     def get_settings(self):
         try:
             return self._get_settings()
-        except:
+        except Exception:
             import traceback
             LOG.error("Failed to parse settings: %s", traceback.format_exc())
             return None
@@ -1092,7 +1098,7 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
                             setattr(obj, setting, int(element.value)/10)
                         else:
                             setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -1103,4 +1109,3 @@ class KGUV8DPlusRadio(chirp_common.CloneModeRadio,
                 or "rx_stop" in element.get_name() \
                 or "tx_start" in element.get_name() \
                 or "tx_stop" in element.get_name()
-

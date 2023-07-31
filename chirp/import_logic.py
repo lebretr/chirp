@@ -114,7 +114,7 @@ def _import_power(dst_radio, _srcrf, mem):
     # If both radios support discrete power levels, we need to decide how to
     # convert the source power level to a valid one for the destination
     # radio.  To do that, find the absolute level of the source value
-    # and calculate the different between it and all the levels of the
+    # and calculate the difference between it and all the levels of the
     # destination, choosing the one that matches most closely. Do this in
     # watts not dBm because we will make the wrong decision otherwise due
     # to the logarithmic scale.
@@ -203,8 +203,9 @@ def _make_offset_with_split(rxfreq, txfreq):
 def _import_duplex(dst_radio, srcrf, mem):
     dstrf = dst_radio.get_features()
 
-    # If a radio does not support odd split, we can use an equivalent offset
     if mem.duplex == "split" and mem.duplex not in dstrf.valid_duplexes:
+        # If a radio does not support odd split, we can use an equivalent
+        # offset
         mem.duplex, mem.offset = _make_offset_with_split(mem.freq, mem.offset)
 
         # Enforce maximum offset
@@ -215,6 +216,10 @@ def _import_duplex(dst_radio, srcrf, mem):
             if lo < mem.freq <= hi:
                 if abs(mem.offset) > limit:
                     raise DestNotCompatible("offset is abnormally large.")
+    elif mem.duplex == 'off' and mem.duplex not in dstrf.valid_duplexes:
+        # If a radio does not support duplex=off, we should just convert to
+        # simplex
+        mem.duplex = ''
 
 
 def import_mem(dst_radio, src_features, src_mem, overrides={}):

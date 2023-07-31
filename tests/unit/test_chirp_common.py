@@ -2,6 +2,7 @@ import base64
 import copy
 import json
 import os
+import pickle
 import tempfile
 
 from unittest import mock
@@ -11,6 +12,7 @@ from chirp import CHIRP_VERSION
 from chirp import chirp_common
 from chirp import directory
 from chirp import errors
+from chirp import settings
 
 
 class TestUtilityFunctions(base.BaseTest):
@@ -743,17 +745,13 @@ class TestOverrideRules(base.BaseTest):
     IMMUTABLE_WHITELIST = [
         # Uncomment me when the time comes
         'Baofeng_GT-5R',
-        'Baofeng_UV-9G',
         'BTECH_GMRS-20V2',
         'BTECH_GMRS-50V2',
         'BTECH_GMRS-50X1',
         'BTECH_GMRS-V2',
         'BTECH_MURS-V2',
         'Radioddity_DB25-G',
-        'Retevis_RA85',
-        'Retevis_RA685',
-        'Retevis_RB17P',
-        'Retevis_RB27',
+        'Retevis_RB17P'
     ]
 
     def _test_radio_override_immutable_policy(self, rclass):
@@ -787,3 +785,27 @@ class TestOverrideRules(base.BaseTest):
                 self._test_radio_override_calls_super(rclass)
             else:
                 self._test_radio_override_immutable_policy(rclass)
+
+
+class TestMemory(base.BaseTest):
+    def test_pickle_with_extra(self):
+        m = chirp_common.Memory()
+        m.extra = settings.RadioSettingGroup('extra', 'extra')
+        m.extra.append(settings.RadioSetting(
+            'test', 'test',
+            settings.RadioSettingValueString(1, 32, current='foo')))
+        n = pickle.loads(pickle.dumps(m))
+        self.assertEqual(str(n.extra['test'].value),
+                         str(m.extra['test'].value))
+
+    def test_frozen_from_frozen(self):
+        m = chirp_common.FrozenMemory(chirp_common.Memory(123))
+        n = chirp_common.FrozenMemory(m)
+        self.assertEqual(123, n.number)
+
+    def test_frozen_dupe_unfrozen(self):
+        FrozenMemory = chirp_common.FrozenMemory(
+            chirp_common.Memory()).__class__
+        m = chirp_common.FrozenMemory(chirp_common.Memory(123)).dupe()
+        self.assertNotIsInstance(m, FrozenMemory)
+        self.assertFalse(hasattr(m, '_frozen'))

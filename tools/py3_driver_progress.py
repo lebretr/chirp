@@ -22,8 +22,8 @@ def tester_link(text):
         assert os.path.exists(os.path.join('chirp', 'drivers',
                                            text[1:] + '.py'))
         return ('[Probably works]('
-            'https://github.com/kk7ds/chirp/blob/py3/chirp/drivers/%s.py)' % (
-                text[1:]))
+                'https://github.com/kk7ds/chirp/blob/py3/chirp/drivers/%s.py)' % (
+                    text[1:]))
     elif text.startswith('#') and text[1:].isdigit():
         return '[Reported working](https://chirp.danplanet.com/issues/%i)' % int(text[1:])
     else:
@@ -112,7 +112,6 @@ def main():
     else:
         output = open(args.output, 'w')
 
-
     print('## Status', file=output)
 
     print('| Driver | Tester | Tested | Byte Clean | "Market Share" |', file=output)
@@ -182,7 +181,7 @@ def main():
     "probably works" status, an actual confirmation with real hardware is
     welcome and can replace the weaker reference.
 
-    ## Minimal test prodecure
+    ## Minimal test procedure
     For the purposes of the Python 3 effort, a "tested" radio means
     at least the following procedure was followed:
     1. Download from the radio
@@ -205,7 +204,7 @@ def main():
     that are fixed for py3 should do so with this flag set to False and with
     the byte-native memory map.
     """),
-    file=output)
+          file=output)
 
     for driver, (tester, tested) in testers.items():
         print('Error in testers file; driver %s by %s on %s unknown' % (

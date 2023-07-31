@@ -1,5 +1,5 @@
 # Copyright 2022 Mel Terechenok <melvin.terechenok@gmail.com>
-# Updated Driver to support Wouxon KG-UV9PX
+# Updated Driver to support Wouxun KG-UV9PX
 # based on prior driver for KG-UV9D Plus by
 # Jim Lieb <lieb@sea-troll.net>
 #
@@ -22,16 +22,14 @@
 """Wouxun KG-UV9D Plus radio management module"""
 
 import time
-import os
 import logging
 import struct
-import string
-from chirp import util, chirp_common, bitwise, memmap, errors, directory
-from chirp.settings import RadioSetting, RadioSettingValue, \
-     RadioSettingGroup, \
-     RadioSettingValueBoolean, RadioSettingValueList, \
-     RadioSettingValueInteger, RadioSettingValueString, \
-     RadioSettings, InvalidValueError
+from chirp import chirp_common, bitwise, memmap, errors, directory
+from chirp.settings import RadioSetting, RadioSettingGroup, \
+     RadioSettingValueBoolean, \
+     RadioSettingValueList, RadioSettingValueInteger, \
+     RadioSettingValueString, RadioSettings, \
+     InvalidValueError
 
 LOG = logging.getLogger(__name__)
 
@@ -88,6 +86,8 @@ config_map = (          # map address, write size, write count
     (0x4840, 48, 1),    # Memory Channels 997-999
     (0x4900, 32, 249),  # Memory Names    1-996
     (0x6820, 24, 1),    # Memory Names    997-999
+    (0x7000, 8, 124),   # Valid Channel bytes 1-992
+    (0x73E0, 1, 7),     # Valid Channel Bytes 993-999
     (0x7400, 64, 5),    # CALL-ID 1-20, names 1-20
     )
 
@@ -121,6 +121,8 @@ config_map2 = (          # map address, write size, write count
     (0x4840, 48, 1),    # Memory Channels 997-999
     (0x4900, 32, 249),  # Memory Names    1-996
     (0x6820, 24, 1),    # Memory Names    997-999
+    (0x7000, 8, 124),   # Valid Channel bytes 1-992
+    (0x73E0, 1, 7),     # Valid Channel Bytes 993-999
     (0x7400, 64, 5),    # CALL-ID 1-20, names 1-20
     (0x7600,  1, 1)     # Screen Mode
     )
@@ -128,7 +130,11 @@ config_map2 = (          # map address, write size, write count
 MEM_VALID = 0xfc
 MEM_INVALID = 0xff
 VALID_MEM_VALUES = [MEM_VALID, 0x00, 0x02, 0x40, 0x3D]
-
+INVALID_MEM_VALUES = [MEM_INVALID]
+# new CHAN_VALID/INVALID mem values to address some radios not showing
+# new channels
+CHAN_VALID = 0x41
+CHAN_INVALID = 0xFC
 # Radio memory map. This matches the reads/writes above.
 # structure elements whose name starts with x are currently unidentified
 
@@ -367,6 +373,11 @@ struct {
 struct {
     char name[8];
 } chan_name[999];
+
+#seekto 0x7000;
+struct {
+    u8 ch_valid;
+} chan_valid[999];
 
 #seekto 0x7400;
 struct {
@@ -639,6 +650,11 @@ struct {
     char pad[2];
 } cid_names[20];
 
+#seekto 0x7000;
+struct {
+    u8 ch_valid;
+} chan_valid[999];
+
 #seekto 0x7600;
 struct {
     u8 screen_mode;
@@ -695,7 +711,7 @@ def _pkt_encode(op, payload):
         xord = xorbits ^ byte
         data[i + 4] = xord
         xorbits = xord
-    return(data)
+    return (data)
 
 
 def _pkt_decode(data):
@@ -896,7 +912,7 @@ def str2name(val, size=6, fillchar='\0', emptyfill='\0'):
     """ Convert a string to a name. A name is a 6 element bytearray
     with ascii chars.
     """
-    val = str(val).rstrip(' \t\r\n\0\0xff')
+    val = str(val).rstrip(' \t\r\n\0\xff')
     if len(val) == 0:
         name = "".ljust(size, emptyfill)
     else:
@@ -1004,8 +1020,10 @@ def _hex_print(data, addrfmt=None):
 
 # Useful UI lists
 STEPS = [2.5, 5.0, 6.25, 10.0, 12.5, 25.0, 50.0, 100.0]
+STEPS_9K = [2.5, 5.0, 6.25, 8.33, 10.0, 12.5, 25.0, 50.0, 100.0]
 S_TONES = [str(x) for x in [1000, 1450, 1750, 2100]]
 STEP_LIST = [str(x)+"kHz" for x in STEPS]
+STEP_LIST_9K = [str(x)+"kHz" for x in STEPS_9K]
 ROGER_LIST = ["Off", "Begin", "End", "Both"]
 TIMEOUT_LIST = [str(x) + "s" for x in range(15, 601, 15)]
 TOA_LIST = ["Off"] + ["%ds" % t for t in range(1, 11)]
@@ -1013,9 +1031,14 @@ BANDWIDTH_LIST = ["Wide", "Narrow"]
 LANGUAGE_LIST = ["English", "Chinese"]
 LANGUAGE_LIST2 = ["English", "Chinese-DISABLED"]
 PF1KEY_LIST = ["OFF", "call id", "r-alarm", "SOS", "SF-TX"]
+PF1KEY_LIST9GX = ["OFF", "call id", "r-alarm", "SOS", "SF-TX", "Scan",
+                  "Second", "Lamp"]
 PF2KEY_LIST = ["OFF", "Scan", "Second", "Lamp", "SDF-DIR", "K-lamp"]
+PF2KEY_LIST9GX = ["OFF", "Scan", "Second", "Lamp", "K-lamp"]
 PF3KEY_LIST2 = ["OFF", "Call ID", "R-ALARM", "SOS", "SF-TX", "Scan",
                 "Second", "Lamp"]
+PF3KEY_LIST9GX = ["OFF", "call id", "r-alarm", "SOS", "SF-TX", "Scan",
+                  "Second", "Lamp"]
 PF3KEY_LIST = ["OFF", "Call ID", "R-ALARM", "SOS", "SF-TX"]
 WORKMODE_LIST = ["VFO freq", "Channel No.", "Ch. No.+Freq.",
                  "Ch. No.+Name"]
@@ -1073,6 +1096,8 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
     POWER_LEVELS = [chirp_common.PowerLevel("L", watts=1),
                     chirp_common.PowerLevel("M", watts=2),
                     chirp_common.PowerLevel("H", watts=5)]
+    _step_list = STEP_LIST
+    _valid_steps = STEPS
     _mmap = ""
 
     def _read_record(self):
@@ -1271,7 +1296,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
         3 channel memory and names slots. As we discover other useful
         goodies in the map, we can add more slots...
         """
-        if self.MODEL == "KG-UV9PX":
+        if (self.MODEL == "KG-UV9PX" or self.MODEL == "KG-UV9GX"):
             cfgmap = config_map2
         else:
             cfgmap = config_map
@@ -1341,7 +1366,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
                           (400000000, 520000000),  # supports 70cm
                           (700000000, 985000000)]
         rf.valid_characters = chirp_common.CHARSET_ASCII
-        rf.valid_tuning_steps = STEPS
+        rf.valid_tuning_steps = self._valid_steps
         rf.memory_bounds = (1, 999)  # 999 memories
         return rf
 
@@ -1411,24 +1436,57 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
         """
         _mem = self._memobj.chan_blk[number - 1]
         _nam = self._memobj.chan_name[number - 1]
+        _val = self._memobj.chan_valid[number - 1]
 
         mem = chirp_common.Memory()
         mem.number = number
         _valid = _mem.state
-        # Override Mem Valid state to handle quirky 9PX CPS New codeplug
-        # issue where there is a channel programmed but the CPS
-        # "state" value is 0xFF indicating an invalid memory
-        if _valid == MEM_INVALID and _mem.rxfreq != 0xFFFFFFFF and _nam != '':
-            _valid = MEM_VALID
 
-        if _valid not in VALID_MEM_VALUES:
-            # In Issue #6995 we can find _valid values of 0 and 2 in the IMG
-            # so these values should be treated like MEM_VALID.
-            # state value of 0x40 found in deleted memory - still shows in CPS
+        # This code attempts to robustly decipher what Wouxun considers valid
+        # memory locations on the 9 series radios and the factory CPS.
+        # It appears they use a combination of State and Rx Freq to determine
+        # validity rather than just the State value.
+        # It is possible the State value is not even used at all.
+        # Rather than continuously adding new Mem Valid values as they are
+        # found, assume any value other than 0xFF is likely valid and use
+        # Rx Freq to further assess validity
+
+        if _mem.rxfreq == 0xFFFFFFFF:
+            # Rx freq indicates empty channel memory
+            # assume empty regardless of _valid and proceed to next channel
+            if _valid not in INVALID_MEM_VALUES:
+                # only log if _valid indicates the channel is not invalid
+                LOG.debug("CH %s Rx Freq = 0xFFFFFFFF - "
+                          "Treating chan as empty", mem.number)
             mem.empty = True
+            _val.ch_valid = CHAN_INVALID
             return mem
-        else:
-            mem.empty = False
+        elif _valid in INVALID_MEM_VALUES:
+            # Check for 9PX case where CPS creates a valid channel with
+            # 0xFF for State -  accept it as valid as long as Rx Freq is
+            # <= max value
+            if _mem.rxfreq > 99999999:  # Max poss Value = 999.99999 MHz
+                LOG.debug("CH %s State invalid - Rx Frq > 999.99999 MHz: "
+                          "Treating chan as empty", mem.number)
+                mem.empty = True
+                _val.ch_valid = CHAN_INVALID
+                return mem
+            else:
+                LOG.debug("CH %s State invalid - Rx Freq valid: "
+                          "Assume chan valid", mem.number)
+                mem.empty = False
+                _val.ch_valid = CHAN_VALID
+        else:  # State not Invalid and Rx Freq not 0xFFFFFFFF
+            if _mem.rxfreq > 99999999:  # Max poss Value = 999.99999 MHz
+                LOG.debug("CH %s Invalid Rx Frq: %s MHz - "
+                          "Treating chan as empty", mem.number,
+                          int(_mem.rxfreq) / 100000)
+                mem.empty = True
+                _val.ch_valid = CHAN_INVALID
+                return mem
+            else:
+                _val.ch_valid = CHAN_VALID
+                mem.empty = False
 
         mem.freq = int(_mem.rxfreq) * 10
 
@@ -1511,6 +1569,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
 
         _mem = self._memobj.chan_blk[number - 1]
         _nam = self._memobj.chan_name[number - 1]
+        _val = self._memobj.chan_valid[number - 1]
 
         if mem.empty:
             # consider putting in a check for chan # that is empty but
@@ -1527,6 +1586,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
             _mem.set_raw("\xFF" * (_mem.size() // 8))
             _nam.name = str2name("", 8, '\0', '\0')
             _mem.state = MEM_INVALID
+            _val.ch_valid = CHAN_INVALID
             return
 
         _mem.rxfreq = int(mem.freq / 10)
@@ -1566,6 +1626,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
         _mem.bit5 = 0   # clear this bit to ensure accurate CPS power level
         _nam.name = str2name(mem.name, 8, '\0', '\0')
         _mem.state = MEM_VALID
+        _val.ch_valid = CHAN_VALID
 
 # Build the UI configuration tabs
 # the channel memory tab is built by the core.
@@ -1576,7 +1637,8 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
         Radio settings common to all modes and areas go here.
         """
         s = self._memobj.settings
-        if self.MODEL == "KG-UV9PX":
+        if (self.MODEL == "KG-UV9PX" or self.MODEL == "KG-UV9GX"):
+
             sm = self._memobj.screen
 
         cf = RadioSettingGroup("cfg_grp", "Configuration")
@@ -1695,14 +1757,14 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
                                "Receive LED (Menu 42)",
                                RadioSettingValueBoolean(s.bledsw)))
 
-        if self.MODEL == "KG-UV9PX":
+        if (self.MODEL == "KG-UV9PX" or self.MODEL == "KG-UV9GX"):
             cf.append(RadioSetting("screen.screen_mode",
                                    "Screen Mode (Menu 62)",
                                    RadioSettingValueList(
-                                    SCREEN_MODE_LIST,
-                                    SCREEN_MODE_LIST[
-                                        sm.screen_mode])))
-        if self.MODEL == "KG-UV9PX":
+                                         SCREEN_MODE_LIST,
+                                         SCREEN_MODE_LIST[
+                                             sm.screen_mode])))
+        if (self.MODEL == "KG-UV9PX" or self.MODEL == "KG-UV9GX"):
             langlst = LANGUAGE_LIST2
         else:
             langlst = LANGUAGE_LIST
@@ -1712,7 +1774,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
                          RadioSettingValueList(langlst,
                                                langlst[s.lang])))
 
-        if self.MODEL == "KG-UV9PX":
+        if (self.MODEL == "KG-UV9PX" or self.MODEL == "KG-UV9GX"):
             ponmsglst = PONMSG_LIST2
         else:
             ponmsglst = PONMSG_LIST
@@ -1847,7 +1909,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
         cf.append(RadioSetting("display.banner",
                                "Display Message", val))
 
-        if self.MODEL == "KG-UV9PX":
+        if (self.MODEL == "KG-UV9PX" or self.MODEL == "KG-UV9GX"):
             _str = str(self._memobj.oemmodel.model).split("\0")[0]
             val = RadioSettingValueString(0, 10, _str)
             val.set_mutable(True)
@@ -2121,7 +2183,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
             RadioSetting(prefix + ".step",
                          "Frequency Step (Menu 3)",
                          RadioSettingValueList(
-                             STEP_LIST, STEP_LIST[c.step])))
+                             self._step_list, self._step_list[c.step])))
         af.append(
             RadioSetting(prefix + ".scan_mode",
                          "Scan Mode (Menu 20)",
@@ -2157,22 +2219,32 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
         """Build radio key/button menu
         """
         s = self._memobj.settings
+        if self.MODEL == "KG-UV9PX":
+            pfkey1 = PF1KEY_LIST
+            pfkey2 = PF2KEY_LIST
+            pfkey3 = PF3KEY_LIST2
+        elif (self.MODEL == "KG-UV9GX" or
+              self.MODEL == "KG-UV9G Pro"):
+            pfkey1 = PF1KEY_LIST9GX
+            pfkey2 = PF2KEY_LIST9GX
+            pfkey3 = PF3KEY_LIST9GX
+        else:
+            pfkey1 = PF1KEY_LIST
+            pfkey2 = PF2KEY_LIST
+            pfkey3 = PF3KEY_LIST
+
         kf = RadioSettingGroup("key_grp", "Key Settings")
 
         kf.append(RadioSetting("settings.pf1",
                                "PF1 Key function (Menu 55)",
                                RadioSettingValueList(
-                                   PF1KEY_LIST,
-                                   PF1KEY_LIST[s.pf1])))
+                                   pfkey1,
+                                   pfkey1[s.pf1])))
         kf.append(RadioSetting("settings.pf2",
                                "PF2 Key function (Menu 56)",
                                RadioSettingValueList(
-                                   PF2KEY_LIST,
-                                   PF2KEY_LIST[s.pf2])))
-        if self.MODEL == "KG-UV9PX":
-            pfkey3 = PF3KEY_LIST2
-        else:
-            pfkey3 = PF3KEY_LIST
+                                   pfkey2,
+                                   pfkey2[s.pf2])))
 
         kf.append(RadioSetting("settings.pf3",
                                "PF3 Key function (Menu 57)",
@@ -2370,7 +2442,7 @@ class KGUV9DPlusRadio(chirp_common.CloneModeRadio,
                             setattr(obj, setting, int(element.value)*10)
                         else:
                             setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug("set_settings: Exception with %s" %
                               element.get_name())
                     raise
@@ -2403,6 +2475,13 @@ class KGUV9PXRadio(KGUV9DPlusRadio):
     _rev = b"02"  # default rev for the radio I know about...
     _file_ident = b"kg-uv9px"
     NEEDS_COMPAT_SERIAL = False
+    _valid_steps = STEPS
+    _step_list = STEP_LIST
+
+    @classmethod
+    def match_model(cls, filedata, filename):
+        # This model is only ever matched via metadata
+        return False
 
     def process_mmap(self):
         if self._rev != b"02" and self._rev != b"00":
@@ -2558,7 +2637,7 @@ class KGUV9PXRadio(KGUV9DPlusRadio):
             RadioSetting(prefix + ".step",
                          "Frequency Step (Menu 3)",
                          RadioSettingValueList(
-                             STEP_LIST, STEP_LIST[c.step])))
+                             self._step_list, self._step_list[c.step])))
         af.append(
             RadioSetting(prefix + ".scan_mode",
                          "Scan Mode (Menu 20)",
@@ -2700,37 +2779,34 @@ class KGUV9PXRadio(KGUV9DPlusRadio):
 
         l = self._memobj.limits
 
-        val = RadioSettingValueInteger(136, 180,
-                                       (l.lim_150M_Txlower_limit) / 10.0)
-        rs = RadioSetting("limits.lim_150M_Txlower_limit",
-                          "150M Tx Lower Limit (MHz)",
-                          RadioSettingValueInteger(136, 180,
-                                                   val))
-        limgrp.append(rs)
+        if self.MODEL == "KG-UV9PX":
+            val = RadioSettingValueInteger(136, 180,
+                                           (l.lim_150M_Txlower_limit) / 10.0)
+            rs = RadioSetting("limits.lim_150M_Txlower_limit",
+                              "150M Tx Lower Limit (MHz)",
+                              RadioSettingValueInteger(136, 180, val))
+            limgrp.append(rs)
 
-        val = RadioSettingValueInteger(136, 180,
-                                       (l.lim_150M_Txupper_limit) / 10.0)
-        rs = RadioSetting("limits.lim_150M_Txupper_limit",
-                          "150M Tx Upper Limit (MHz + 0.9975)",
-                          RadioSettingValueInteger(136, 180,
-                                                   val))
-        limgrp.append(rs)
+            val = RadioSettingValueInteger(136, 180,
+                                           (l.lim_150M_Txupper_limit) / 10.0)
+            rs = RadioSetting("limits.lim_150M_Txupper_limit",
+                              "150M Tx Upper Limit (MHz + 0.9975)",
+                              RadioSettingValueInteger(136, 180, val))
+            limgrp.append(rs)
 
-        val = RadioSettingValueInteger(400, 512,
-                                       (l.lim_450M_Txlower_limit) / 10.0)
-        rs = RadioSetting("limits.lim_450M_Txlower_limit",
-                          "450M Tx Lower Limit (MHz)",
-                          RadioSettingValueInteger(400, 512,
-                                                   val))
-        limgrp.append(rs)
+            val = RadioSettingValueInteger(400, 512,
+                                           (l.lim_450M_Txlower_limit) / 10.0)
+            rs = RadioSetting("limits.lim_450M_Txlower_limit",
+                              "450M Tx Lower Limit (MHz)",
+                              RadioSettingValueInteger(400, 512, val))
+            limgrp.append(rs)
 
-        val = RadioSettingValueInteger(400, 512,
-                                       (l.lim_450M_Txupper_limit) / 10.0)
-        rs = RadioSetting("limits.lim_450M_Txupper_limit",
-                          "450M Tx Upper Limit (MHz + 0.9975)",
-                          RadioSettingValueInteger(400, 512,
-                                                   val))
-        limgrp.append(rs)
+            val = RadioSettingValueInteger(400, 512,
+                                           (l.lim_450M_Txupper_limit) / 10.0)
+            rs = RadioSetting("limits.lim_450M_Txupper_limit",
+                              "450M Tx Upper Limit (MHz + 0.9975)",
+                              RadioSettingValueInteger(400, 512, val))
+            limgrp.append(rs)
 
         val = RadioSettingValueInteger(108, 180,
                                        (l.lim_150M_area_a_rxlower_limit) /
@@ -2832,3 +2908,59 @@ class KGUV9PXRadio(KGUV9DPlusRadio):
         limgrp.append(rs)
 
         return limgrp
+
+
+@directory.register
+class KGUV9GXRadio(KGUV9PXRadio):
+
+    """Wouxun KG-UV9GX"""
+    VENDOR = "Wouxun"
+    MODEL = "KG-UV9GX"
+    _model = b"KG-UV9D"
+    _rev = b"02"  # default rev for the radio I know about...
+    NEEDS_COMPAT_SERIAL = False
+    _valid_steps = STEPS
+    _step_list = STEP_LIST
+
+    @classmethod
+    def match_model(cls, filedata, filename):
+        # This model is only ever matched via metadata
+        return False
+
+
+@directory.register
+class KGUV9KRadio(KGUV9DPlusRadio):
+
+    """Wouxun KG-UV9K"""
+    VENDOR = "Wouxun"
+    MODEL = "KG-UV9K"
+    _model = b"KG-UV9D"
+    _file_ident = b"kg-uv9k"
+    _rev = b"02"  # default rev for the radio I know about...
+    NEEDS_COMPAT_SERIAL = False
+    _step_list = STEP_LIST_9K
+    _valid_steps = STEPS_9K
+
+    @classmethod
+    def match_model(cls, filedata, filename):
+        # This model is only ever matched via metadata
+        return False
+
+
+@directory.register
+class KGUV9GProRadio(KGUV9DPlusRadio):
+
+    """Wouxun KG-UV9G Pro"""
+    VENDOR = "Wouxun"
+    MODEL = "KG-UV9G Pro"
+    _model = b"KG-UV9D"
+    _file_ident = b"kg-uv9gpro"
+    _rev = b"02"  # default rev for the radio I know about...
+    NEEDS_COMPAT_SERIAL = False
+    _step_list = STEP_LIST
+    _valid_steps = STEPS
+
+    @classmethod
+    def match_model(cls, filedata, filename):
+        # This model is only ever matched via metadata
+        return False

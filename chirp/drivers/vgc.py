@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
 import struct
 import logging
 import re
@@ -352,7 +351,7 @@ def _clean_buffer(radio):
     junk = radio.pipe.read(256)
     radio.pipe.timeout = STIMEOUT
     if junk:
-        Log.debug("Got %i bytes of junk before starting" % len(junk))
+        LOG.debug("Got %i bytes of junk before starting" % len(junk))
 
 
 def _check_for_double_ack(radio):
@@ -391,7 +390,7 @@ def _rawsend(radio, data):
 
 
 def _make_frame(cmd, addr, length, data=""):
-    """Pack the info in the headder format"""
+    """Pack the info in the header format"""
     frame = struct.pack(">BHB", ord(cmd), addr, length)
     # add the data if set
     if len(data) != 0:
@@ -554,6 +553,21 @@ def model_match(cls, data):
         return True
 
     return False
+
+
+def _split(rf, f1, f2):
+    """Returns False if the two freqs are in the same band (no split)
+    or True otherwise"""
+
+    # determine if the two freqs are in the same band
+    for low, high in rf.valid_bands:
+        if f1 >= low and f1 <= high and \
+                f2 >= low and f2 <= high:
+            # if the two freqs are on the same Band this is not a split
+            return False
+
+    # if you get here is because the freq pairs are split
+    return True
 
 
 class VGCStyleRadio(chirp_common.CloneModeRadio,
@@ -750,12 +764,17 @@ class VGCStyleRadio(chirp_common.CloneModeRadio,
         else:
             # TX feq set
             offset = (int(_mem.txfreq) * 10) - mem.freq
-            if offset < 0:
-                mem.offset = abs(offset)
-                mem.duplex = "-"
-            elif offset > 0:
-                mem.offset = offset
-                mem.duplex = "+"
+            if offset != 0:
+                if _split(self.get_features(), mem.freq, int(
+                          _mem.txfreq) * 10):
+                    mem.duplex = "split"
+                    mem.offset = int(_mem.txfreq) * 10
+                elif offset < 0:
+                    mem.offset = abs(offset)
+                    mem.duplex = "-"
+                elif offset > 0:
+                    mem.offset = offset
+                    mem.duplex = "+"
             else:
                 mem.offset = 0
 
@@ -1407,7 +1426,7 @@ class VGCStyleRadio(chirp_common.CloneModeRadio,
                         setattr(obj, setting, int(element.value) + 5)
                     elif setting in ["tt1stdly", "ttdlyqt"]:
                         setattr(obj, setting, int(element.value) + 2)
-                    elif re.match('code\d', setting):
+                    elif re.match(r'code\d', setting):
                         # set dtmf length field and then get bcd dtmf
                         dtmfstrlen = len(str(element.value).strip())
                         setattr(_mem.dtmfcode, setting + "_len", dtmfstrlen)
@@ -1416,7 +1435,7 @@ class VGCStyleRadio(chirp_common.CloneModeRadio,
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 

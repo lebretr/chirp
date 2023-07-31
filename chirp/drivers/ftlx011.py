@@ -13,29 +13,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import struct
-import os
 import logging
 import time
 
-from time import sleep
-from chirp import chirp_common, directory, memmap, errors, util, bitwise
+from chirp import chirp_common, directory, memmap, errors, bitwise
 from chirp.settings import RadioSettingGroup, RadioSetting, \
     RadioSettingValueBoolean, RadioSettingValueList, \
-    RadioSettingValueString, RadioSettingValueInteger, \
-    RadioSettingValueFloat, RadioSettings, InvalidValueError
+    RadioSettings
 
 LOG = logging.getLogger(__name__)
 
-### SAMPLE MEM DUMP as sent from the radios
+# SAMPLE MEM DUMP as sent from the radios
 
 # FTL-1011
-#0x000000  52 f0 16 90 04 08 38 c0  00 00 00 01 00 00 00 ff  |R.....8.........|
-#0x000010  20 f1 00 20 00 00 00 20  04 47 25 04 47 25 00 00  | .. ... .G%.G%..|
+# 0x000000  52 f0 16 90 04 08 38 c0  00 00 00 01 00 00 00 ff  |R.....8.........|
+# 0x000010  20 f1 00 20 00 00 00 20  04 47 25 04 47 25 00 00  | .. ... .G%.G%..|
 
 # FTL-2011
-#0x000000: 50 90 21 40 04 80 fc 40  00 00 00 01 00 00 00 ff  |P.!@...@........|
-#0x000010: 20 f1 00 0b 00 00 00 0b  14 51 70 14 45 70 00 00  |.........Qp.Ep..|
+# 0x000000: 50 90 21 40 04 80 fc 40  00 00 00 01 00 00 00 ff  |P.!@...@........|
+# 0x000010: 20 f1 00 0b 00 00 00 0b  14 51 70 14 45 70 00 00  |.........Qp.Ep..|
 
 
 MEM_FORMAT = """
@@ -56,7 +52,7 @@ u8 scan_resume:1,           // Scan sesume: 0 = 0.5 seconds, 1 = Carrier
    talk_back:1,             // Talk Back: 0 = enabled, 1 = disabled
    tx_carrier_delay:1;      // TX carrier delay: 1 = enabled, 0 = disabled
 u8 tot:4,                   // Time out timer: 16 values (0.0-7.5 in 0.5s step)
-   tot_resume:2,            // Time out timer resume: 3, 2, 1, 0 => 0s, 6s, 20s, 60s 
+   tot_resume:2,            // Time out timer resume: 3, 2, 1, 0 => 0s, 6s, 20s, 60s
    unknownB:2;
 u8 a_key:2,                 // A key function: resume: 0-3: Talkaround, High/Low, Call, Accessory
    unknownB:6;
@@ -98,14 +94,14 @@ DTCS_CODES = chirp_common.DTCS_CODES
 SKIP_VALUES = ["", "S"]
 LIST_BCL = ["OFF", "Carrier", "Tone"]
 LIST_SCAN_RESUME = ["0.5 seconds", "Carrier drop"]
-LIST_SCAN_TIME = ["%smsecs" % x for x in range(5, 85, 5)]
+LIST_SCAN_TIME = ["%s ms" % x for x in range(5, 85, 5)]
 LIST_SCAN_P_SPEED = ["Slow", "Fast"]
 LIST_HOME_CHANNEL = ["Scan Start ch", "Priority 1ch"]
 LIST_TOT = ["Off"] + ["%.1f s" % (x/10.0) for x in range(5, 80, 5)]
-# 3, 2, 1, 0 => 0s, 6s, 20s, 60s
-LIST_TOT_RESUME = ["60s","20s","6s","0s"]
+# 3, 2, 1, 0 => 0 s, 6 s, 20 s, 60 s
+LIST_TOT_RESUME = ["60 s", "20 s", "6 s", "0 s"]
 LIST_A_KEY = ["Talkaround", "High/Low", "Call", "Accessory"]
-LIST_PCH = [] # dynamic, as depends on channel list.
+LIST_PCH = []  # dynamic, as depends on channel list.
 # make a copy of the tones, is not funny to work with this directly
 TONES = list(chirp_common.TONES)
 # this old radios has not the full tone ranges in CST
@@ -142,7 +138,7 @@ def _checksum(data):
     """the radio block checksum algorithm"""
     cs = 0
     for byte in data:
-            cs += ord(byte)
+        cs += ord(byte)
 
     return cs % 256
 
@@ -215,11 +211,10 @@ def _do_upload(radio):
     status.msg = " Quick, press MON on the radio to start. "
     radio.status_fn(status)
 
-    for byte in range(0,100):
+    for byte in range(0, 100):
         status.cur = byte
         radio.status_fn(status)
         time.sleep(0.1)
-
 
     # real upload if user don't cancel the timeout
     status.cur = 0
@@ -281,7 +276,7 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
     _memsize = MEM_SIZE
     _upper = 0
     _range = []
-    finger = [] # two elements rid & IF
+    finger = []  # two elements rid & IF
 
     @classmethod
     def get_prompts(cls):
@@ -342,7 +337,7 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
         rf.valid_skips = SKIP_VALUES
         rf.valid_modes = ["FM"]
         rf.valid_power_levels = POWER_LEVELS
-        #rf.valid_tuning_steps = [5.0]
+        # rf.valid_tuning_steps = [5.0]
         rf.valid_bands = [self._range]
         rf.memory_bounds = (1, self._upper)
         return rf
@@ -392,7 +387,7 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
         return repr(self._memobj.memory[number])
 
     def _decode_tone(self, mem, rx=True):
-        """Parse the tone data to decode from mem tones are encodded like this
+        """Parse the tone data to decode from mem tones are encoded like this
         CTCS: mapped [0x80...0xa5] = [67.0...250.3]
         DTCS: mixed  [0x88, 0x23] last is BCD and first is the 100 power - 88
 
@@ -405,7 +400,7 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
             t = mem.rx_tone
         else:
             t = mem.tx_tone
-        
+
         tMSB = t[0]
         tLSB = t[1]
 
@@ -446,9 +441,9 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
         if mode == "DTCS":
             tone[0] = int(value / 100) + 0x88
             tone[1] = int_to_bcd(value % 100)
-        
+
         if mode == "Tone":
-            #CTCS
+            # CTCS
             tone[1] = TONES.index(value) + 128
 
         # set it
@@ -617,7 +612,7 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
                         # activate the tone
                         _mem.rx_tone = [0x00, 0x80]
         else:
-            # reset extra settings 
+            # reset extra settings
             _zero_settings()
 
         _mem.chname = chname
@@ -629,20 +624,20 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
         basic = RadioSettingGroup("basic", "Basic Settings")
         group = RadioSettings(basic)
 
-        # ## Basic Settings 
+        # ## Basic Settings
         scanr = RadioSetting("scan_resume", "Scan resume by",
-                          RadioSettingValueList(
+                             RadioSettingValueList(
                               LIST_SCAN_RESUME, LIST_SCAN_RESUME[_settings.scan_resume]))
         basic.append(scanr)
 
         scant = RadioSetting("scan_time", "Scan time per channel",
-                          RadioSettingValueList(
+                             RadioSettingValueList(
                               LIST_SCAN_TIME, LIST_SCAN_TIME[_settings.scan_time]))
         basic.append(scant)
 
         LIST_PCH = ["%s" % x for x in range(1, _settings.chcount + 1)]
         pch1 = RadioSetting("pch1", "Priority channel 1",
-                             RadioSettingValueList(
+                            RadioSettingValueList(
                                  LIST_PCH, LIST_PCH[_settings.pch1]))
         basic.append(pch1)
 
@@ -660,8 +655,8 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
                                 LIST_SCAN_P_SPEED, LIST_SCAN_P_SPEED[_settings.priority_speed]))
         basic.append(scanps)
 
-        oh = RadioSetting("off_hook", "Off Hook", #inverted
-                        RadioSettingValueBoolean(not _settings.off_hook))
+        oh = RadioSetting("off_hook", "Off Hook",  # inverted
+                          RadioSettingValueBoolean(not _settings.off_hook))
         basic.append(oh)
 
         tb = RadioSetting("talk_back", "Talk Back",  # inverted
@@ -669,17 +664,17 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
         basic.append(tb)
 
         tot = RadioSetting("tot", "Time out timer",
-                             RadioSettingValueList(
+                           RadioSettingValueList(
                                  LIST_TOT, LIST_TOT[_settings.tot]))
         basic.append(tot)
 
         totr = RadioSetting("tot_resume", "Time out timer resume guard",
-                           RadioSettingValueList(
+                            RadioSettingValueList(
                                LIST_TOT_RESUME, LIST_TOT_RESUME[_settings.tot_resume]))
         basic.append(totr)
 
         ak = RadioSetting("a_key", "A Key function",
-                            RadioSettingValueList(
+                          RadioSettingValueList(
                                 LIST_A_KEY, LIST_A_KEY[_settings.a_key]))
         basic.append(ak)
 
@@ -695,7 +690,6 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
         txd = RadioSetting("tx_carrier_delay", "Talk Back",
                            RadioSettingValueBoolean(_settings.tx_carrier_delay))
         basic.append(txd)
-
 
         return group
 
@@ -720,7 +714,7 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
                     setattr(_settings, name, value)
 
                 LOG.debug("Setting %s: %s" % (name, value))
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 
@@ -736,7 +730,7 @@ class ftlx011(chirp_common.CloneModeRadio, chirp_common.ExperimentalRadio):
         # testing the firmware fingerprint, this experimental
         try:
             match_model = _model_match(cls, filedata)
-        except Exception as e:
+        except Exception:
             match_model = False
 
         return match_size and match_model

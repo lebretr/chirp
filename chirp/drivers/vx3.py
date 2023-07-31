@@ -17,10 +17,8 @@
 from chirp.drivers import yaesu_clone
 from chirp import chirp_common, directory, bitwise
 from chirp.settings import RadioSetting, RadioSettingGroup, \
-    RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettings
-import os
+    RadioSettingValueList, RadioSettingValueBoolean, \
+    RadioSettingValueString, RadioSettings
 import re
 import logging
 
@@ -622,7 +620,7 @@ class VX3Radio(yaesu_clone.YaesuCloneModeRadio):
                 "apo", "APO time (hrs)",
                 RadioSettingValueList(opts, opts[_settings.apo])))
 
-        opts = ["+/- 5 MHZ", "+/- 10 MHZ", "+/- 50 MHZ", "+/- 100 MHZ"]
+        opts = ["+/- 5 MHz", "+/- 10 MHz", "+/- 50 MHz", "+/- 100 MHz"]
         basic.append(RadioSetting(
                 "channel_counter", "Channel counter",
                 RadioSettingValueList(opts, opts[_settings.channel_counter])))
@@ -939,7 +937,7 @@ class VX3Radio(yaesu_clone.YaesuCloneModeRadio):
             try:
                 setting = element.get_name()
                 _settings = self._memobj.settings
-                if re.match('dtmf\d', setting):
+                if re.match(r'dtmf\d', setting):
                     # set dtmf fields
                     dtmfstr = str(element.value).strip()
                     newval = []
@@ -973,6 +971,6 @@ class VX3Radio(yaesu_clone.YaesuCloneModeRadio):
                     newval = self._encode_chars(newval, 6)
                 LOG.debug("Setting %s(%s) <= %s" % (setting, oldval, newval))
                 setattr(_settings, setting, newval)
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise

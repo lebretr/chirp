@@ -224,10 +224,27 @@ KEY_NAMES = {
     'Mic PF2': 'pf2',
 }
 
+KNOB = {
+    0x00: 'None',
+    0x01: 'Channel Up/Down',
+    0x02: 'Group Up/Down',
+}
+
+BATTSAVE = {
+    0xFF: 'Off',
+    0x30: 'Short',
+    0x31: 'Medium',
+    0x32: 'Long',
+}
+
 mem_format = """
 #seekto 0x00E;
 u8 zone_count;
 u8 memory_count;
+
+#seekto 0x01F;
+// 0xFF=off, 0x30=short, 0x31=med, 0x32=long
+u8 battsave;
 
 #seekto 0x110;
 // 4F=none 31=dtmfidbot 32=dmtfideot 33=chup 35=home 37=chandn 38=dispchr
@@ -605,7 +622,32 @@ class KenwoodTKx140Radio(chirp_common.CloneModeRadio):
         keys = tk8160.TKx160Radio.make_key_group(self._memobj.keys,
                                                  KEY_NAMES,
                                                  KEYS)
-        return settings.RadioSettings(zones, keys)
+
+        def apply_knob(setting):
+            rev = {v: k for k, v in KNOB.items()}
+            self._memobj.knob = rev[str(setting.value)]
+
+        knob = settings.RadioSetting(
+            'knob', 'Knob',
+            settings.RadioSettingValueList(
+                KNOB.values(), current_index=self._memobj.knob))
+        knob.set_apply_callback(apply_knob)
+        keys.append(knob)
+
+        def apply_battsave(setting):
+            rev = {v: k for k, v in BATTSAVE.items()}
+            self._memobj.battsave = rev[str(setting.value)]
+
+        general = settings.RadioSettingGroup('general', 'General')
+        battsave = settings.RadioSetting(
+            'battsave', 'Battery Save',
+            settings.RadioSettingValueList(
+                BATTSAVE.values(),
+                BATTSAVE[int(self._memobj.battsave)]))
+        battsave.set_apply_callback(apply_battsave)
+        general.append(battsave)
+
+        return settings.RadioSettings(zones, keys, general)
 
     def set_settings(self, _settings):
         for element in _settings:

@@ -14,7 +14,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
-import os
 import struct
 import logging
 
@@ -93,14 +92,6 @@ VOXDELAY_LIST = ["0.5 | Off",
                  "2.5 | 3",
                  "3.0 | 4",
                  "--- | 5"]
-
-SETTING_LISTS = {
-    "pf2key": PF2KEY_LIST,
-    "tot": TIMEOUTTIMER_LIST,
-    "voice": VOICE_LIST,
-    "vox": VOX_LIST,
-    "voxdelay": VOXDELAY_LIST,
-    }
 
 VALID_CHARS = chirp_common.CHARSET_ALPHANUMERIC + \
     "`{|}!\"#$%&'()*+,-./:;<=>?@[]^_"
@@ -676,7 +667,7 @@ class RT22Radio(chirp_common.CloneModeRadio):
 
                     LOG.debug("Setting %s = %s" % (setting, element.value))
                     setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 

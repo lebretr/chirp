@@ -23,8 +23,8 @@ import serial
 from chirp import chirp_common, directory, bitwise, memmap, errors, util
 from chirp.settings import RadioSetting, RadioSettingGroup, \
                 RadioSettingValueBoolean, RadioSettingValueList, \
-                RadioSettingValueInteger, RadioSettingValueString, \
-                RadioSettingValueFloat, RadioSettingValueMap, RadioSettings
+                RadioSettingValueInteger, RadioSettingValueFloat, \
+                RadioSettingValueMap, RadioSettings
 
 LOG = logging.getLogger(__name__)
 
@@ -186,6 +186,7 @@ def do_upload(radio):
                     "Radio NAK'd block at address 0x%04x" % i)
         LOG.debug("Radio ACK'd block at address 0x%04x" % i)
         do_status(radio, "to", i)
+
 
 DUPLEX = ["", "+", "-"]
 TGUV2P_STEPS = [5, 6.25, 10, 12.5, 15, 20, 25, 30, 50, 100]
@@ -766,7 +767,7 @@ class QuanshengTGUV2P(chirp_common.CloneModeRadio,
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 

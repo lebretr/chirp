@@ -17,17 +17,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
-import struct
 import logging
-import re
-import math
 import threading
 from chirp import chirp_common, directory, memmap
-from chirp import bitwise, errors, util
+from chirp import bitwise, errors
 from chirp.settings import RadioSettingGroup, RadioSetting, \
     RadioSettingValueBoolean, RadioSettingValueList, \
     RadioSettingValueString, RadioSettingValueInteger, \
-    RadioSettingValueFloat, RadioSettings, InvalidValueError
+    RadioSettingValueFloat, RadioSettings
 
 LOG = logging.getLogger(__name__)
 
@@ -207,7 +204,6 @@ def _connect_radio(radio):
                 (RADIO_IDS[resp], radio.MODEL)
             raise errors.RadioError(msg)
     raise errors.RadioError("No response from radio")
-    return
 
 
 def read_str(radio, trm=";"):
@@ -972,7 +968,7 @@ class TS590Radio(chirp_common.CloneModeRadio):
             return
 
         def my_mhz_val(setting, obj, atrb, ndx=-1):
-            """ Callback to set freq back to Htz"""
+            """ Callback to set freq back to Hz """
             vx = float(str(setting.value))
             vx = int(vx * mhz1)
             if ndx < 0:
@@ -1637,7 +1633,7 @@ class TS590Radio(chirp_common.CloneModeRadio):
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -1655,7 +1651,7 @@ class TS590SRadio(TS590Radio):
     ID = "ID021;"
     SG = False
     # This is the equivalent Menu A/B list for the TS-590S
-    # The equivalnt S param is stored in the SG Mem_Format slot
+    # The equivalent S param is stored in the SG Mem_Format slot
     EX = ["EX087", "EX000", "EX001", "EX003", "EX004", "EX005",
           "EX006", "EX007", "EX008", "EX009", "EX010", "EX011", "EX014",
           "EX014", "EX015", "EX016", "EX017", "EX018", "EX019", "EX020",

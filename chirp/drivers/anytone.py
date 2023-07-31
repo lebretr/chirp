@@ -13,9 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import struct
-import time
 import logging
 
 from chirp import bitwise
@@ -230,6 +228,7 @@ def _read(radio, length):
         LOG.debug(util.hexprint(data))
         raise errors.RadioError("Short read from radio")
     return data
+
 
 valid_model = [b'QX588UV', b'HR-2040', b'DB-50M\x00', b'DB-750X']
 

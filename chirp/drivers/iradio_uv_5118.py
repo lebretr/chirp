@@ -13,18 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
-import os
 import struct
-import re
 import logging
 
 from chirp import chirp_common, directory, memmap
 from chirp import bitwise, errors, util
 from chirp.settings import RadioSetting, RadioSettingGroup, \
     RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString, \
-    RadioSettingValueFloat, RadioSettings
+    RadioSettingValueBoolean, RadioSettingValueFloat, \
+    RadioSettings
 
 LOG = logging.getLogger(__name__)
 
@@ -168,7 +165,7 @@ def _checksum(data):
 def _enter_programming_mode(radio):
     serial = radio.pipe
 
-    # lengthen the timeout here as these radios are reseting due to timeout
+    # lengthen the timeout here as these radios are resetting due to timeout
     radio.pipe.timeout = 0.75
 
     exito = False
@@ -509,7 +506,7 @@ class IradioUV5118(chirp_common.CloneModeRadio):
         LOG.debug("Setting %i(%s)" % (mem.number, mem.extd_number))
         _mem = self._memobj.channels[mem.number - 1]
 
-        # if empty memmory
+        # if empty memory
         if mem.empty:
             _mem.set_raw("\xFF" * 16)
             return
@@ -1102,7 +1099,7 @@ class IradioUV5118(chirp_common.CloneModeRadio):
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 

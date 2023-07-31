@@ -16,7 +16,6 @@
 """Wouxun radios management module"""
 
 import time
-import os
 import logging
 from chirp import util, chirp_common, bitwise, memmap, errors, directory
 from chirp.settings import RadioSetting, RadioSettingGroup, \
@@ -31,7 +30,7 @@ FREQ_ENCODE_TABLE = [0x7, 0xa, 0x0, 0x9, 0xb, 0x2, 0xe, 0x1, 0x3, 0xf]
 
 
 def encode_freq(freq):
-    """Convert frequency (4 decimal digits) to wouxun format (2 bytes)"""
+    """Convert frequency (4 decimal digits) to Wouxun format (2 bytes)"""
     enc = 0
     div = 1000
     for i in range(0, 4):
@@ -42,7 +41,7 @@ def encode_freq(freq):
 
 
 def decode_freq(data):
-    """Convert from wouxun format (2 bytes) to frequency (4 decimal digits)"""
+    """Convert from Wouxun format (2 bytes) to frequency (4 decimal digits)"""
     freq = 0
     shift = 12
     for i in range(0, 4):
@@ -241,7 +240,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
                 i += 1
 
     def _identify(self):
-        """Do the original wouxun identification dance"""
+        """Do the original Wouxun identification dance"""
         query = self._get_querymodel()
         for _i in range(0, 10):
             self.pipe.write(next(query))
@@ -269,7 +268,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
             raise Exception("Radio refused transfer mode")
 
     def _download(self):
-        """Talk to an original wouxun and do a download"""
+        """Talk to an original Wouxun and do a download"""
         try:
             self._identify()
             self._start_transfer()
@@ -280,7 +279,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
             raise errors.RadioError("Failed to communicate with radio: %s" % e)
 
     def _upload(self):
-        """Talk to an original wouxun and do an upload"""
+        """Talk to an original Wouxun and do an upload"""
         try:
             self._identify()
             self._start_transfer()
@@ -300,7 +299,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
     def process_mmap(self):
         if len(self._mmap.get_packed()) != 8192:
             LOG.info("Fixing old-style Wouxun image")
-            # Originally, CHIRP's wouxun image had eight bytes of
+            # Originally, CHIRP's Wouxun image had eight bytes of
             # static data, followed by the first memory at offset
             # 0x0008.  Between 0.1.11 and 0.1.12, this was fixed to 16
             # bytes of (whatever) followed by the first memory at
@@ -660,7 +659,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
                     else:
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -682,7 +681,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
                 else:
                     setting = self._memobj.fm_presets_1
                 setting[index] = value
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 
@@ -692,7 +691,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
                 setattr(self._memobj.freq_ranges,
                         element.get_name(),
                         encode_freq(int(element.value)))
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 
@@ -898,7 +897,7 @@ class KGUVD1PRadio(chirp_common.CloneModeRadio,
                 filedata[0x0d70:0x0d80] == \
                 b"\xff\xff\xff\xff\xff\xff\xff\xff" \
                 b"\xff\xff\xff\xff\xff\xff\xff\xff":
-                # those areas are (seems to be) unused
+            # those areas are (seems to be) unused
             return True
         # Old-style image (CHIRP 0.1.11)
         if len(filedata) == 8200 and \
@@ -1400,7 +1399,7 @@ class KGUV6DRadio(KGUVD1PRadio):
                     else:
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -1422,7 +1421,7 @@ class KGUV6DRadio(KGUVD1PRadio):
                 else:
                     setting = self._memobj.fm_presets_1
                 setting[index] = value
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 

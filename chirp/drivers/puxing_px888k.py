@@ -670,7 +670,7 @@ def show_progress(radio, blockaddr, upper, msg):
 def do_download(radio):
     """download from the radio to the memory map"""
     initial_handshake(radio.pipe, 10)
-    memory = memmap.MemoryMap(b'\xff'*0x1000)
+    memory = memmap.MemoryMapBytes(b'\xff'*0x1000)
     for blockaddr in range(LOWER_READ_BOUND, UPPER_READ_BOUND, BLOCKSIZE):
         LOG.debug("Reading block "+str(blockaddr))
         block = read_block(radio.pipe, blockaddr)
@@ -816,7 +816,7 @@ def encode_5tone(data, fieldlen):
 
 
 def decode_freq(data):
-    """decode frequency data for the broadcast fm radio memories"""
+    """decode frequency data for the broadcast FM radio memories"""
     data_out = ''
     if data[0] != 0xff:
         data_out = chirp_common.format_freq(
@@ -825,7 +825,7 @@ def decode_freq(data):
 
 
 def encode_freq(data, fieldlen):
-    """encode frequency data for the broadcast fm radio memories"""
+    """encode frequency data for the broadcast FM radio memories"""
     data_out = bytearray(b'\xff')*fieldlen
     if data != '':
         data_out = encode_halfbytes((('%%0%di' % (fieldlen << 1)) %
@@ -1099,6 +1099,7 @@ class Puxing_PX888K_Radio(chirp_common.CloneModeRadio):
     VENDOR = "Puxing"
     MODEL = "PX-888K"
     BAUD_RATE = 9600
+    NEEDS_COMPAT_SERIAL = False
 
     @classmethod
     def match_model(cls, filedata, filename):
@@ -1825,7 +1826,7 @@ class Puxing_PX888K_Radio(chirp_common.CloneModeRadio):
                          NO_YES),
             ]
 
-        # broadcast fm radio settings
+        # broadcast FM radio settings
         broadcast_settings = [
             list_setting("band", "Frequency interval",
                          _broadcast.receive_range,

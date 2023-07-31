@@ -25,10 +25,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
 import struct
 import logging
-import re
 
 from chirp import chirp_common, directory, memmap
 from chirp import bitwise, errors, util
@@ -180,7 +178,7 @@ struct mem {
                           // BJ-318 band power overrides any
                           // individual channel power setting
       wide:1,
-      compandor:1
+      compander:1
       scrambler:1
       unknown:4;
   u8  namelen;
@@ -237,38 +235,13 @@ LIST_STATE = ["Normal", "Stun", "Kill"]
 LIST_SSF = ["1000", "1450", "1750", "2100"]
 LIST_DTMFTX = ["50", "100", "150", "200", "300", "500"]
 
-SETTING_LISTS = {
-    "init_bank": LIST_TDR_DEF,
-    "tot": LIST_TIMEOUT,
-    "wtled": LIST_COLOR,   # not used in BJ-318, other radios use
-    "rxled": LIST_COLOR,   # not used in BJ-318, other radios use
-    "txled": LIST_COLOR,   # not used in BJ-318, other radios use
-    "sig_freq": LIST_SSF,
-    "dtmf_txms": LIST_DTMFTX,
-    "ledsw": LIST_LEDSW,
-    "frq_chn_mode": LIST_VFOMODE,
-    "rx_tone": LIST_CTCSS,
-    "tx_tone": LIST_CTCSS,
-    "rx_mode": LIST_RECVMODE,
-    "launch_sig": LIST_SIGNAL,
-    "tx_end_sig": LIST_SIGNAL,
-    "bpower": LIST_BPOWER,
-    "fm_bw": LIST_BW,
-    "shift": LIST_SHIFT,
-    "step": LIST_STEPS,
-    "ring": LIST_RING,
-    "state_now": LIST_STATE,
-    "up_scr_color": LIST_COLOR318,  # unique to BJ-318
-    "dn_scr_color": LIST_COLOR318,  # unique to BJ-318
-}
-
 
 def _clean_buffer(radio):
     radio.pipe.timeout = 0.005
     junk = radio.pipe.read(256)
     radio.pipe.timeout = STIMEOUT
     if junk:
-        Log.debug("Got %i bytes of junk before starting" % len(junk))
+        LOG.debug("Got %i bytes of junk before starting" % len(junk))
 
 
 def _rawrecv(radio, amount):
@@ -298,7 +271,7 @@ def _rawsend(radio, data):
 
 
 def _make_frame(cmd, addr, length, data=""):
-    """Pack the info in the headder format"""
+    """Pack the info in the header format"""
     frame = struct.pack(">4sHH", cmd, addr, length)
     # Add the data if set
     if len(data) != 0:
@@ -719,9 +692,9 @@ class LT725UV(chirp_common.CloneModeRadio):
         eotsignal = RadioSetting("eotsignal", "Transmit end signaling", rx)
         mem.extra.append(eotsignal)
 
-        rx = RadioSettingValueBoolean(bool(_mem.compandor))
-        compandor = RadioSetting("compandor", "Compandor", rx)
-        mem.extra.append(compandor)
+        rx = RadioSettingValueBoolean(bool(_mem.compander))
+        compander = RadioSetting("compander", "Compander", rx)
+        mem.extra.append(compander)
 
         rx = RadioSettingValueBoolean(bool(_mem.scrambler))
         scrambler = RadioSetting("scrambler", "Scrambler", rx)
@@ -1029,7 +1002,7 @@ class LT725UV(chirp_common.CloneModeRadio):
         basic.append(rs)
 
         tmp = str(int(_sets.sig_freq))
-        rs = RadioSetting("settings.sig_freq", "Single Signaling Tone (Htz)",
+        rs = RadioSetting("settings.sig_freq", "Single Signaling Tone (Hz)",
                           RadioSettingValueList(LIST_SSF, tmp))
         rs.set_apply_callback(my_val_list, _sets, "sig_freq")
         basic.append(rs)
@@ -1069,7 +1042,7 @@ class LT725UV(chirp_common.CloneModeRadio):
         a_band.append(rs)
 
         tmp = my_tone_strn(_vfoa, "is_rxdigtone", "rxdtcs_pol", "rx_tone")
-        rs = RadioSetting("rx_tone", "Default Recv CTCSS (Htz)",
+        rs = RadioSetting("rx_tone", "Default Recv CTCSS (Hz)",
                           RadioSettingValueList(LIST_CTCSS, tmp))
         rs.set_apply_callback(my_set_tone, _vfoa, "is_rxdigtone",
                               "rxdtcs_pol", "rx_tone")
@@ -1081,7 +1054,7 @@ class LT725UV(chirp_common.CloneModeRadio):
         a_band.append(rs)
 
         tmp = my_tone_strn(_vfoa, "is_txdigtone", "txdtcs_pol", "tx_tone")
-        rs = RadioSetting("tx_tone", "Default Xmit CTCSS (Htz)",
+        rs = RadioSetting("tx_tone", "Default Xmit CTCSS (Hz)",
                           RadioSettingValueList(LIST_CTCSS, tmp))
         rs.set_apply_callback(my_set_tone, _vfoa, "is_txdigtone",
                               "txdtcs_pol", "tx_tone")
@@ -1101,7 +1074,7 @@ class LT725UV(chirp_common.CloneModeRadio):
         a_band.append(rs)
 
         rx = RadioSettingValueBoolean(bool(_vfoa.cmp_nder))
-        rs = RadioSetting("upper.vfoa.cmp_nder", "Compandor", rx)
+        rs = RadioSetting("upper.vfoa.cmp_nder", "Compander", rx)
         a_band.append(rs)
 
         rs = RadioSetting("upper.vfoa.scrm_blr", "Scrambler",
@@ -1180,7 +1153,7 @@ class LT725UV(chirp_common.CloneModeRadio):
         b_band.append(rs)
 
         tmp = my_tone_strn(_vfob, "is_rxdigtone", "rxdtcs_pol", "rx_tone")
-        rs = RadioSetting("rx_tone", "Default Recv CTCSS (Htz)",
+        rs = RadioSetting("rx_tone", "Default Recv CTCSS (Hz)",
                           RadioSettingValueList(LIST_CTCSS, tmp))
         rs.set_apply_callback(my_set_tone, _vfob, "is_rxdigtone",
                               "rxdtcs_pol", "rx_tone")
@@ -1191,7 +1164,7 @@ class LT725UV(chirp_common.CloneModeRadio):
         b_band.append(rs)
 
         tmp = my_tone_strn(_vfob, "is_txdigtone", "txdtcs_pol", "tx_tone")
-        rs = RadioSetting("tx_tone", "Default Xmit CTCSS (Htz)",
+        rs = RadioSetting("tx_tone", "Default Xmit CTCSS (Hz)",
                           RadioSettingValueList(LIST_CTCSS, tmp))
         rs.set_apply_callback(my_set_tone, _vfob, "is_txdigtone",
                               "txdtcs_pol", "tx_tone")
@@ -1209,7 +1182,7 @@ class LT725UV(chirp_common.CloneModeRadio):
         rs = RadioSetting("lower.vfob.fm_bw", "Wide/Narrow Band", rx)
         b_band.append(rs)
 
-        rs = RadioSetting("lower.vfob.cmp_nder", "Compandor",
+        rs = RadioSetting("lower.vfob.cmp_nder", "Compander",
                           RadioSettingValueBoolean(bool(_vfob.cmp_nder)))
         b_band.append(rs)
 
@@ -1555,7 +1528,7 @@ class LT725UV(chirp_common.CloneModeRadio):
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 

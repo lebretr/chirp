@@ -14,7 +14,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import struct
-import os
 import logging
 
 from chirp import chirp_common, directory, memmap, errors, util, bitwise
@@ -178,7 +177,7 @@ def do_magic(radio):
     status.msg = "Linking to radio, please wait."
     radio.status_fn(status)
 
-    # every byte of this magic chain must be send separatedly
+    # every byte of this magic chain must be send separately
     magic = "\x02PROGRA"
 
     # start the fun, finger crossed please...
@@ -585,7 +584,7 @@ class FeidaxinFD2x8yRadio(chirp_common.CloneModeRadio):
         # preparing for callback on vrxfreq (handled also in a special )
         vf_freq = RadioSetting("none.vrx_freq", "VFO frequency",
                                RadioSettingValueString(0, 10, chirp_common.
-                               format_freq(vfo)))
+                                                       format_freq(vfo)))
         vf_freq.set_apply_callback(apply_freq, _mem.vfo.vrx_freq)
         work.append(vf_freq)
 
@@ -612,7 +611,7 @@ class FeidaxinFD2x8yRadio(chirp_common.CloneModeRadio):
 
         offset = RadioSetting("none.vfo_shift", "VFO Offset",
                               RadioSettingValueString(0, 9, chirp_common.
-                              format_freq(vfo_shift)))
+                                                      format_freq(vfo_shift)))
         work.append(offset)
 
         step = RadioSetting("settings", "VFO step",
@@ -633,7 +632,7 @@ class FeidaxinFD2x8yRadio(chirp_common.CloneModeRadio):
                 ani_value = "200"
 
             ani_value = "".join(x for x in ani_value if (int(x) >= 2 and
-                        int(x) <= 9))
+                                                         int(x) <= 9))
 
             ani = RadioSetting("ani", "ANI (200-999)",
                                RadioSettingValueString(0, 3, ani_value))
@@ -759,7 +758,7 @@ class FeidaxinFD2x8yRadio(chirp_common.CloneModeRadio):
                     try:
                         element.run_apply_callback()
                         continue
-                    except NotImplementedError as e:
+                    except NotImplementedError:
                         raise
 
                 elif sett == "none":
@@ -777,11 +776,11 @@ class FeidaxinFD2x8yRadio(chirp_common.CloneModeRadio):
                         obj = getattr(_mem, sett)
                         setattr(obj, name, element.value)
 
-                    except AttributeError as e:
+                    except AttributeError:
                         m = "Setting %s is not in this setting block" % name
                         LOG.debug(m)
 
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 

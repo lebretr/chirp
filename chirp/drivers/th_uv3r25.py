@@ -19,8 +19,7 @@ from chirp import chirp_common, bitwise, directory
 from chirp.drivers.wouxun import do_download, do_upload
 
 from chirp.settings import RadioSetting, RadioSettingGroup, \
-    RadioSettingValueInteger, RadioSettingValueList, \
-    RadioSettingValueBoolean, RadioSettingValueString
+    RadioSettingValueList, RadioSettingValueBoolean
 
 from chirp.drivers.th_uv3r import TYTUV3RRadio, tyt_uv3r_prep, THUV3R_CHARSET
 
@@ -33,6 +32,7 @@ def tyt_uv3r_download(radio):
 def tyt_uv3r_upload(radio):
     tyt_uv3r_prep(radio)
     return do_upload(radio, 0x0000, 0x0B30, 0x0010)
+
 
 mem_format = """
 // 20 bytes per memory

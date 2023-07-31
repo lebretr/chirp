@@ -106,7 +106,9 @@ struct {
   u8 save;
   u8 ligcon;
   u8 voxdelay;
-  u8 alarm;
+  u8 onlychmode:1,
+     unused:6,
+     alarm:1;
 } settings;
 
 #seekto 0x0CB8;
@@ -395,40 +397,6 @@ TXPOWER3_LIST = ["High", "Mid", "Low"]
 VOICE_LIST = ["Off", "English", "Chinese"]
 VOX_LIST = ["OFF"] + ["%s" % x for x in range(1, 11)]
 WORKMODE_LIST = ["Frequency", "Channel"]
-
-SETTING_LISTS = {
-    "almod": ALMOD_LIST,
-    "aniid": PTTID_LIST,
-    "displayab": AB_LIST,
-    "dtmfst": DTMFST_LIST,
-    "dtmfspeed": DTMFSPEED_LIST,
-    "mdfa": MODE_LIST,
-    "mdfb": MODE_LIST,
-    "ponmsg": PONMSG_LIST,
-    "pttid": PTTID_LIST,
-    "rtone": RTONE_LIST,
-    "rogerrx": ROGERRX_LIST,
-    "rpste": RPSTE_LIST,
-    "rxled": COLOR_LIST,
-    "save": SAVE_LIST,
-    "scode": PTTIDCODE_LIST,
-    "screv": RESUME_LIST,
-    "sftd": SHIFTD_LIST,
-    "stedelay": STEDELAY_LIST,
-    "step": STEP_LIST,
-    "step291": STEP291_LIST,
-    "tdrab": TDRAB_LIST,
-    "tdrch": TDRCH_LIST,
-    "timeout": TIMEOUT_LIST,
-    "txled": COLOR_LIST,
-    "txpower": TXPOWER_LIST,
-    "txpower3": TXPOWER3_LIST,
-    "voice": VOICE_LIST,
-    "vox": VOX_LIST,
-    "widenarr": BANDWIDTH_LIST,
-    "workmode": WORKMODE_LIST,
-    "wtled": COLOR_LIST
-}
 
 GMRS_FREQS = bandplan_na.GMRS_HIRPT
 
@@ -1189,8 +1157,8 @@ class TDH8(chirp_common.CloneModeRadio):
                               SYNC_LIST, SYNC_LIST[_settings.sync]))
         basic.append(rs)
 
-        if _settings.lang == 1:
-            langs = 0
+        if _settings.lang in (2, 3):
+            langs = 1
         else:
             langs = 0
         rs = RadioSetting("lang", "Language",
@@ -1244,6 +1212,10 @@ class TDH8(chirp_common.CloneModeRadio):
 
         rs = RadioSetting("rxled", "Disp Lcd(RX)",
                           RadioSettingValueBoolean(_settings.rxled))
+        basic.append(rs)
+
+        rs = RadioSetting("onlychmode", "Only CH Mode",
+                          RadioSettingValueBoolean(_settings.onlychmode))
         basic.append(rs)
 
         rs = RadioSetting("stopkey1", "SHORT_KEY_TOP",
@@ -2029,6 +2001,9 @@ class TDH8(chirp_common.CloneModeRadio):
                                 list_val.append(0xFF)
                                 lenth_val += 1
                         self._memobj.group8.group8 = list_val
+                    elif setting == 'lang':
+                        self._memobj.settings.lang = (
+                                str(element.value) == 'English' and 2 or 1)
                     elif element.value.get_mutable():
                         setattr(obj, setting, element.value)
                 except Exception:

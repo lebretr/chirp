@@ -17,7 +17,6 @@ from builtins import bytes
 
 import struct
 import time
-import os
 import logging
 
 from chirp import chirp_common, errors, util, directory, memmap
@@ -194,8 +193,10 @@ struct {
      txpower3:2;
 } vfob;
 
-#seekto 0x0F56;
-u16 fm_presets;
+#seekto 0x0F48;     // some new radios do not support this feature
+char bcstfmlo[14];  // broadcast FM 65-75 MHz band
+u16 fm_presets;     // broadcast FM frequency
+char bcstfmhi[14];  // broadcast FM 75-108 MHz band
 
 #seekto 0x1008;
 struct {
@@ -301,7 +302,7 @@ MODE_LIST = ["Channel", "Name", "Frequency"]
 PONMSG_LIST = ["Full", "Message"]
 PTTID_LIST = ["Off", "BOT", "EOT", "Both"]
 PTTIDCODE_LIST = ["%s" % x for x in range(1, 16)]
-RTONE_LIST = ["1000 Hz", "1450 Hz", "1750 Hz", "2100Hz"]
+RTONE_LIST = ["1000 Hz", "1450 Hz", "1750 Hz", "2100 Hz"]
 RESUME_LIST = ["TO", "CO", "SE"]
 ROGERRX_LIST = ["Off"] + AB_LIST
 RPSTE_LIST = ["OFF"] + ["%s" % x for x in range(1, 11)]
@@ -323,40 +324,6 @@ VOICE_LIST = ["Off", "English", "Chinese"]
 VOX_LIST = ["OFF"] + ["%s" % x for x in range(1, 11)]
 WORKMODE_LIST = ["Frequency", "Channel"]
 
-SETTING_LISTS = {
-    "almod": ALMOD_LIST,
-    "aniid": PTTID_LIST,
-    "displayab": AB_LIST,
-    "dtmfst": DTMFST_LIST,
-    "dtmfspeed": DTMFSPEED_LIST,
-    "mdfa": MODE_LIST,
-    "mdfb": MODE_LIST,
-    "ponmsg": PONMSG_LIST,
-    "pttid": PTTID_LIST,
-    "rtone": RTONE_LIST,
-    "rogerrx": ROGERRX_LIST,
-    "rpste": RPSTE_LIST,
-    "rxled": COLOR_LIST,
-    "save": SAVE_LIST,
-    "scode": PTTIDCODE_LIST,
-    "screv": RESUME_LIST,
-    "sftd": SHIFTD_LIST,
-    "stedelay": STEDELAY_LIST,
-    "step": STEP_LIST,
-    "step291": STEP291_LIST,
-    "tdrab": TDRAB_LIST,
-    "tdrch": TDRCH_LIST,
-    "timeout": TIMEOUT_LIST,
-    "txled": COLOR_LIST,
-    "txpower": TXPOWER_LIST,
-    "txpower3": TXPOWER3_LIST,
-    "voice": VOICE_LIST,
-    "vox": VOX_LIST,
-    "widenarr": BANDWIDTH_LIST,
-    "workmode": WORKMODE_LIST,
-    "wtled": COLOR_LIST
-}
-
 GMRS_FREQS1 = [462562500, 462587500, 462612500, 462637500, 462662500,
                462687500, 462712500]
 GMRS_FREQS2 = [467562500, 467587500, 467612500, 467637500, 467662500,
@@ -366,12 +333,13 @@ GMRS_FREQS3 = [462550000, 462575000, 462600000, 462625000, 462650000,
 GMRS_FREQS = GMRS_FREQS1 + GMRS_FREQS2 + GMRS_FREQS3 * 2
 
 
-def _do_status(radio, block):
+def _do_status(radio, direction, block):
     status = chirp_common.Status()
-    status.msg = "Cloning"
+    status.msg = "Cloning %s radio" % direction
     status.cur = block
     status.max = radio.get_memsize()
     radio.status_fn(status)
+
 
 UV5R_MODEL_ORIG = b"\x50\xBB\xFF\x01\x25\x98\x4D"
 UV5R_MODEL_291 = b"\x50\xBB\xFF\x20\x12\x07\x25"
@@ -401,7 +369,6 @@ def _firmware_version_from_image(radio):
         radio.get_mmap().get_byte_compatible(),
         radio._fw_ver_file_start,
         radio._fw_ver_file_stop)
-    LOG.debug("_firmware_version_from_image: " + util.hexprint(version))
     return version
 
 
@@ -488,7 +455,7 @@ def _read_block(radio, start, size, first_command=False):
         LOG.debug("CMD: %s  ADDR: %04x  SIZE: %02x" % (cmd, addr, length))
         raise errors.RadioError("Unknown response from radio")
 
-    chunk = radio.pipe.read(0x40)
+    chunk = radio.pipe.read(size)
     if not chunk:
         raise errors.RadioError("Radio did not send block 0x%04x" % start)
     elif len(chunk) != size:
@@ -506,10 +473,12 @@ def _get_radio_firmware_version(radio):
         block = _read_block(radio, 0x1FF0, 0x40, True)
         version = block[0:6]
     else:
-        block1 = _read_block(radio, 0x1EC0, 0x40, True)
-        block2 = _read_block(radio, 0x1F00, 0x40, False)
-        block = block1 + block2
-        version = block[48:62]
+        block1 = _read_block(radio, 0x1E80, 0x40, True)
+        block2 = _read_block(radio, 0x1EC0, 0x40, False)
+        block3 = _read_block(radio, 0x0F40, 0x40, False)
+        version = block2[48:62]
+        brdcstfm = block3[0:30]
+        return version, brdcstfm
     return version
 
 
@@ -533,7 +502,7 @@ def _ident_radio(radio):
     for magic, reason in list(IDENT_BLACKLIST.items()):
         try:
             _do_ident(radio, magic, secondack=False)
-        except errors.RadioError as e:
+        except errors.RadioError:
             # No match, try the next one
             continue
 
@@ -553,7 +522,10 @@ def _ident_radio(radio):
 def _do_download(radio):
     data = _ident_radio(radio)
 
-    radio_version = _get_radio_firmware_version(radio)
+    if radio.MODEL == "BJ-UV55":
+        radio_version = _get_radio_firmware_version(radio)
+    else:
+        radio_version, radio_fm = _get_radio_firmware_version(radio)
     LOG.info("Radio Version is %s" % repr(radio_version))
 
     if b"HN5RV" in radio_version:
@@ -591,8 +563,8 @@ def _do_download(radio):
     LOG.debug("downloading main block...")
     for i in range(0, 0x1800, 0x40):
         data += _read_block(radio, i, 0x40, False)
-        _do_status(radio, i)
-    _do_status(radio, radio.get_memsize())
+        _do_status(radio, "from", i)
+    _do_status(radio, "from", radio.get_memsize())
     LOG.debug("done.")
     if radio._aux_block:
         LOG.debug("downloading aux block...")
@@ -627,9 +599,15 @@ def _do_upload(radio):
             raise errors.RadioError("Image not supported by radio")
 
     image_version = _firmware_version_from_image(radio)
-    radio_version = _get_radio_firmware_version(radio)
+    if radio.MODEL == "BJ-UV55":
+        radio_version = _get_radio_firmware_version(radio)
+    else:
+        radio_version, radio_fm = _get_radio_firmware_version(radio)
     LOG.info("Image Version is %s" % repr(image_version))
     LOG.info("Radio Version is %s" % repr(radio_version))
+
+    imagev_matched_radiov = image_version == radio_version
+    _skip_aux_block = False
 
     # default ranges
     _ranges_main_default = [
@@ -638,62 +616,76 @@ def _do_upload(radio):
         (0x0E08, 0x1808)
         ]
     _ranges_aux_default = [
-        (0x1EC0, 0x1EF0),
+        (0x1EC0, 0x1EF0)   # 6 key power-on & welcome messages
+        ]
+
+    # skip broadcast fm range
+    _ranges_main_no_fm = [
+        (0x0008, 0x0CF8),
+        (0x0D08, 0x0DF8),
+        (0x0E08, 0x0F48),
+        (0x0F68, 0x1808)
         ]
 
     # extra aux ranges
     _ranges_aux_extra = [
-        (0x1F60, 0x1F70),
-        (0x1F80, 0x1F90),
-        (0x1FC0, 0x1FE0)
+        (0x1F60, 0x1F70),  # squelch thresholds - vhf
+        (0x1F80, 0x1F90),  # squelch thresholds - uhf
+        (0x1FC0, 0x1FE0)   # band limits
         ]
 
+    # set default ranges
+    ranges_main = _ranges_main_default
+    ranges_aux = _ranges_aux_default
+
+    # check destination radio for invalid bcst FM data
+    if b"\xFF" in radio_fm:
+        # 0x0F48-0x0F65 contains invalid data
+        # This radio is likely to 'break' the Aux block if it is changed.
+        # The safest thing to do is to skip uploading of the Aux block.
+        ranges_main = _ranges_main_no_fm
+        _skip_aux_block = True
+    # check source image for invalid bcst FM data
+    elif "\xFF" in str(radio._memobj.bcstfmlo) or \
+            "\xFF" in str(radio._memobj.bcstfmhi):
+        # 0x0F48-0x0F65 contains invalid data
+        # This image appears to be from a radio that was likely to 'break'
+        # the Aux block if it is changed (and could be broken).
+        # The safest thing to do is to skip uploading of the Aux block.
+        ranges_main = _ranges_main_no_fm
+        _skip_aux_block = True
+    # check if radio and image firmware versions match
+    elif imagev_matched_radiov:
+        # matched - allow all safe Aux block ranges
+        ranges_aux = _ranges_aux_default + _ranges_aux_extra
+
     if radio._all_range_flag:
-        image_matched_radio = True
+        _skip_aux_block = False
         ranges_main = radio._ranges_main
         ranges_aux = radio._ranges_aux
         LOG.warning('Sending all ranges to radio as instructed')
-    elif image_version == radio_version:
-        image_matched_radio = True
-        ranges_main = _ranges_main_default
-        ranges_aux = _ranges_aux_default + _ranges_aux_extra
-    elif any(type in radio_version for type in radio._basetype):
-        image_matched_radio = False
-        ranges_main = _ranges_main_default
-        ranges_aux = _ranges_aux_default
-    else:
-        msg = ("The upload was stopped because the firmware "
-               "version of the image (%s) does not match that "
-               "of the radio (%s).")
-        raise errors.RadioError(msg % (image_version, radio_version))
-
-    if not radio._aux_block:
-        image_matched_radio = True
 
     # Main block
     mmap = radio.get_mmap().get_byte_compatible()
     for start_addr, end_addr in ranges_main:
         for i in range(start_addr, end_addr, 0x10):
             _send_block(radio, i - 0x08, mmap[i:i + 0x10])
-            _do_status(radio, i)
-        _do_status(radio, radio.get_memsize())
+            _do_status(radio, "to", i)
+        _do_status(radio, "to", radio.get_memsize())
 
     if len(mmap.get_packed()) == 0x1808:
         LOG.info("Old image, not writing aux block")
         return  # Old image, no aux block
+
+    if _skip_aux_block:
+        LOG.info("Skipped writing aux block")
+        return  # Aux block skipped
 
     # Auxiliary block at radio address 0x1EC0, our offset 0x1808
     for start_addr, end_addr in ranges_aux:
         for i in range(start_addr, end_addr, 0x10):
             addr = 0x1808 + (i - 0x1EC0)
             _send_block(radio, i, mmap[addr:addr + 0x10])
-
-    if not image_matched_radio:
-        msg = ("Upload finished, but the 'Other Settings' "
-               "could not be sent because the firmware "
-               "version of the image (%s) does not match "
-               "that of the radio (%s).")
-        raise errors.RadioError(msg % (image_version, radio_version))
 
     if radio._all_range_flag:
         radio._all_range_flag = False
@@ -702,6 +694,14 @@ def _do_upload(radio):
             "This is NOT an error.\n"
             "The upload has finished successfully.\n"
             "Please restart CHIRP.")
+
+    if radio._aux_block and not imagev_matched_radiov:
+        msg = ("This is NOT an error. The upload finished successfully.\n"
+               "The 'Other Settings' and 'Service Settings' were skipped "
+               "because the firmware version of the image (%s) does not "
+               "match that of the radio (%s).")
+        raise errors.RadioError(msg % (image_version, radio_version))
+
 
 UV5R_POWER_LEVELS = [chirp_common.PowerLevel("High", watts=4.00),
                      chirp_common.PowerLevel("Low",  watts=1.00)]
@@ -1104,7 +1104,6 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
 
     def _is_orig(self):
         version_tag = _firmware_version_from_image(self)
-        LOG.debug("@_is_orig, version_tag: %s", util.hexprint(version_tag))
         try:
             if b'BFB' in version_tag:
                 idx = version_tag.index(b"BFB") + 3
@@ -1129,6 +1128,7 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
         return band_tag
 
     def _get_settings(self):
+        _mem = self._memobj
         _ani = self._memobj.ani
         _fm_presets = self._memobj.fm_presets
         _settings = self._memobj.settings
@@ -1136,6 +1136,9 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
         _vfoa = self._memobj.vfoa
         _vfob = self._memobj.vfob
         _wmchannel = self._memobj.wmchannel
+        _has_fmradio = (str(_mem.bcstfmlo) == "   FM   65-75M" and
+                        str(_mem.bcstfmhi) == "   FM  76-108M")
+
         basic = RadioSettingGroup("basic", "Basic Settings")
         advanced = RadioSettingGroup("advanced", "Advanced Settings")
 
@@ -1382,30 +1385,35 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
             rs = RadioSetting("firmware_msg.line2", "Firmware Message 2", val)
             other.append(rs)
 
+            aux_settings = []
+
             _msg = self._memobj.sixpoweron_msg
-            rs = RadioSetting("sixpoweron_msg.line1", "6+Power-On Message 1",
+            rs = RadioSetting("sixpoweron_msg.line1",
+                              "6+Power-On Message 1",
                               RadioSettingValueString(
                                   0, 7, _filter(_msg.line1)))
-            other.append(rs)
-            rs = RadioSetting("sixpoweron_msg.line2", "6+Power-On Message 2",
+            aux_settings.append(rs)
+            rs = RadioSetting("sixpoweron_msg.line2",
+                              "6+Power-On Message 2",
                               RadioSettingValueString(
                                   0, 7, _filter(_msg.line2)))
-            other.append(rs)
+            aux_settings.append(rs)
 
             _msg = self._memobj.poweron_msg
             rs = RadioSetting("poweron_msg.line1", "Power-On Message 1",
                               RadioSettingValueString(
                                   0, 7, _filter(_msg.line1)))
-            other.append(rs)
+            aux_settings.append(rs)
             rs = RadioSetting("poweron_msg.line2", "Power-On Message 2",
                               RadioSettingValueString(
                                   0, 7, _filter(_msg.line2)))
-            other.append(rs)
+            aux_settings.append(rs)
 
             rs = RadioSetting("ponmsg", "Power-On Message",
                               RadioSettingValueList(
-                                  PONMSG_LIST, PONMSG_LIST[_settings.ponmsg]))
-            other.append(rs)
+                                  PONMSG_LIST,
+                                  PONMSG_LIST[_settings.ponmsg]))
+            aux_settings.append(rs)
 
             if self._is_orig():
                 limit = "limits_old"
@@ -1413,32 +1421,46 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
                 limit = "limits_new"
 
             vhf_limit = getattr(self._memobj, limit).vhf
-            rs = RadioSetting("%s.vhf.lower" % limit, "VHF Lower Limit (MHz)",
+            rs = RadioSetting("%s.vhf.lower" % limit,
+                              "VHF Lower Limit (MHz)",
                               RadioSettingValueInteger(1, 1000,
                                                        vhf_limit.lower))
-            other.append(rs)
+            aux_settings.append(rs)
 
-            rs = RadioSetting("%s.vhf.upper" % limit, "VHF Upper Limit (MHz)",
+            rs = RadioSetting("%s.vhf.upper" % limit,
+                              "VHF Upper Limit (MHz)",
                               RadioSettingValueInteger(1, 1000,
                                                        vhf_limit.upper))
-            other.append(rs)
+            aux_settings.append(rs)
 
             rs = RadioSetting("%s.vhf.enable" % limit, "VHF TX Enabled",
                               RadioSettingValueBoolean(vhf_limit.enable))
-            other.append(rs)
+            aux_settings.append(rs)
 
             uhf_limit = getattr(self._memobj, limit).uhf
-            rs = RadioSetting("%s.uhf.lower" % limit, "UHF Lower Limit (MHz)",
+            rs = RadioSetting("%s.uhf.lower" % limit,
+                              "UHF Lower Limit (MHz)",
                               RadioSettingValueInteger(1, 1000,
                                                        uhf_limit.lower))
-            other.append(rs)
-            rs = RadioSetting("%s.uhf.upper" % limit, "UHF Upper Limit (MHz)",
+            aux_settings.append(rs)
+            rs = RadioSetting("%s.uhf.upper" % limit,
+                              "UHF Upper Limit (MHz)",
                               RadioSettingValueInteger(1, 1000,
                                                        uhf_limit.upper))
-            other.append(rs)
+            aux_settings.append(rs)
             rs = RadioSetting("%s.uhf.enable" % limit, "UHF TX Enabled",
                               RadioSettingValueBoolean(uhf_limit.enable))
-            other.append(rs)
+            aux_settings.append(rs)
+
+            hn5rv_warn = ('This setting will not be uploaded to your radio '
+                          'because some radios with your firmware version are '
+                          'known to be broken when CHIRP sends that data '
+                          'to them. Please see bug #10505 on the CHIRP '
+                          'issue tracker for more details.')
+            for setting in aux_settings:
+                if not _has_fmradio:
+                    setting.set_warning(hn5rv_warn)
+                other.append(setting)
 
         if self.MODEL != "UV-6":
             workmode = RadioSettingGroup("workmode", "Work Mode Settings")
@@ -1613,29 +1635,30 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
                                       STEP_LIST, STEP_LIST[_vfob.step]))
                 workmode.append(rs)
 
-        fm_preset = RadioSettingGroup("fm_preset", "FM Radio Preset")
-        group.append(fm_preset)
+        if _has_fmradio:
+            fm_preset = RadioSettingGroup("fm_preset", "FM Radio Preset")
+            group.append(fm_preset)
 
-        # broadcast FM settings
-        value = self._memobj.fm_presets
-        value_shifted = ((value & 0x00FF) << 8) | ((value & 0xFF00) >> 8)
-        if value_shifted >= 65.0 * 10 and value_shifted <= 108.0 * 10:
-            # storage method 3 (discovered 2022)
-            self._bw_shift = True
-            preset = value_shifted / 10.0
-        elif value >= 65.0 * 10 and value <= 108.0 * 10:
-            # storage method 2
-            preset = value / 10.0
-        elif value <= 108.0 * 10 - 650:
-            # original storage method (2012)
-            preset = value / 10.0 + 65
-        else:
-            # unknown (undiscovered method or no FM chip?)
-            preset = False
-        if preset:
-            rs = RadioSettingValueFloat(65, 108.0, preset, 0.1, 1)
-            rset = RadioSetting("fm_presets", "FM Preset(MHz)", rs)
-            fm_preset.append(rset)
+            # broadcast FM settings
+            value = self._memobj.fm_presets
+            value_shifted = ((value & 0x00FF) << 8) | ((value & 0xFF00) >> 8)
+            if value_shifted >= 65.0 * 10 and value_shifted <= 108.0 * 10:
+                # storage method 3 (discovered 2022)
+                self._bw_shift = True
+                preset = value_shifted / 10.0
+            elif value >= 65.0 * 10 and value <= 108.0 * 10:
+                # storage method 2
+                preset = value / 10.0
+            elif value <= 108.0 * 10 - 650:
+                # original storage method (2012)
+                preset = value / 10.0 + 65
+            else:
+                # unknown (undiscovered method or no FM chip?)
+                preset = False
+            if preset:
+                rs = RadioSettingValueFloat(65, 108.0, preset, 0.1, 1)
+                rset = RadioSetting("fm_presets", "FM Preset(MHz)", rs)
+                fm_preset.append(rset)
 
         dtmf = RadioSettingGroup("dtmf", "DTMF Settings")
         group.append(dtmf)
@@ -1748,6 +1771,8 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
                                       RadioSettingValueInteger(
                                           0, 123,
                                           getattr(_obj, "sql%i" % (index))))
+                    if not _has_fmradio:
+                        rs.set_warning(hn5rv_warn)
                     service.append(rs)
 
         return group
@@ -1793,7 +1818,7 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
                     elif element.value.get_mutable():
                         LOG.debug("Setting %s = %s" % (setting, element.value))
                         setattr(obj, setting, element.value)
-                except Exception as e:
+                except Exception:
                     LOG.debug(element.get_name())
                     raise
 
@@ -1809,7 +1834,7 @@ class BaofengUV5R(chirp_common.CloneModeRadio):
                 if self._bw_shift:
                     value = ((value & 0x00FF) << 8) | ((value & 0xFF00) >> 8)
                 self._memobj.fm_presets = value
-            except Exception as e:
+            except Exception:
                 LOG.debug(element.get_name())
                 raise
 

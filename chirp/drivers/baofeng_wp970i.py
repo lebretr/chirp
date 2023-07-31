@@ -14,15 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import time
-import struct
 import logging
-import re
 
 from chirp.drivers import baofeng_common
-from chirp import chirp_common, directory, memmap
-from chirp import bitwise, errors, util
-from chirp import bandplan_na
+from chirp import chirp_common, directory
+from chirp import bitwise
 from chirp.settings import RadioSettingGroup, RadioSetting, \
     RadioSettingValueBoolean, RadioSettingValueList, \
     RadioSettingValueString, RadioSettingValueInteger, \
@@ -993,26 +989,7 @@ class UV9G(WP970I):
                     chirp_common.PowerLevel("Med",  watts=0.50),
                     chirp_common.PowerLevel("Low",  watts=0.50)]
     _magic = [MSTRING_UV9G, ]
-    _gmrs = True
-
-    def validate_memory(self, mem):
-        msgs = super().validate_memory(mem)
-
-        _msg_duplex = 'Duplex must be "off" for this frequency'
-        _msg_offset = 'Only simplex or +5MHz offset allowed on GMRS'
-
-        if mem.freq not in bandplan_na.ALL_GMRS_FREQS:
-            if mem.duplex != "off":
-                msgs.append(chirp_common.ValidationWarning(_msg_duplex))
-        if mem.freq in bandplan_na.GMRS_HIRPT:
-            if mem.duplex and mem.offset != 5000000:
-                msgs.append(chirp_common.ValidationWarning(_msg_offset))
-
-        return msgs
-
-    def check_set_memory_immutable_policy(self, existing, new):
-        existing.immutable = []
-        super().check_set_memory_immutable_policy(existing, new)
+    _gmrs = False  # sold as GMRS radio but supports full band TX/RX
 
     @classmethod
     def match_model(cls, filedata, filename):

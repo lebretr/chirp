@@ -16,10 +16,8 @@
 import os
 import csv
 import logging
-import re
 
 from chirp import chirp_common, errors, directory
-from chirp import import_logic
 
 LOG = logging.getLogger(__name__)
 DEFAULT_POWER_LEVEL = chirp_common.AutoNamedPowerLevel(50)
@@ -177,7 +175,7 @@ class CSVRadio(chirp_common.FileBackedRadio):
                     val = typ(val)
                 if hasattr(mem, attr):
                     setattr(mem, attr, val)
-            except OmittedHeaderError as e:
+            except OmittedHeaderError:
                 pass
             except Exception as e:
                 raise Exception("[%s] %s" % (attr, e))
@@ -197,9 +195,7 @@ class CSVRadio(chirp_common.FileBackedRadio):
 
         self._blank()
 
-        with open(self._filename, newline='', encoding='utf-8') as f:
-            header = f.readline().strip()
-            f.seek(0, 0)
+        with open(self._filename, newline='', encoding='utf-8-sig') as f:
             return self._load(f)
 
     def _load(self, f):
@@ -316,6 +312,13 @@ class CSVRadio(chirp_common.FileBackedRadio):
             return False
         return filename.lower().endswith("." + cls.FILE_EXTENSION) and \
             (filedata.startswith("Location,") or filedata == "")
+
+
+# This is not enough to actually behave like a D-STAR radio because we need
+# to use this class when opening files. However, it's enough for export to
+# CSV
+class DSTARCSVRadio(CSVRadio, chirp_common.IcomDstarSupport):
+    pass
 
 
 @directory.register

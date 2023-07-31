@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BASE="$1"
+BASE=${1:-origin/master}
 RETCODE=0
 
 RED='\033[1;31m'
@@ -14,6 +14,7 @@ function fail() {
 
 echo -e "${GREEN}Checking from $(git rev-parse --short ${BASE}):${NC}"
 git log --pretty=oneline --no-merges --abbrev-commit ${BASE}..
+echo
 
 git diff ${BASE}.. '*.py' | grep '^+' > added_lines
 
@@ -53,6 +54,11 @@ if grep '/cpep8.blacklist' added_lines; then
     fail 'Do not add new files to cpep8.blacklist'
 fi
 
+grep -i 'license' added_lines > license_lines
+if grep -ivE '(GNU General Public License|Free Software Foundation|gnu.org.licenses)' license_lines; then
+    fail 'Files must be GPLv3 licensed (or not contain any license language)'
+fi
+
 for file in $(git diff --name-only ${BASE}..); do
     if file $file | grep -q CRLF; then
         fail "$file : Files should be LF (Unix) format, not CR (Mac) or CRLF (Windows)"
@@ -63,10 +69,25 @@ if git log ${BASE}.. --merges | grep .; then
     fail Please do not include merge commits in your PR
 fi
 
-make -C chirp/locale clean all >/dev/null
+make -C chirp/locale clean all >/dev/null 2>&1
 if git diff chirp/locale | grep '^\+[^#+]' | grep -v POT-Creation; then
-    git diff
     fail Locale files need updating
 fi
+
+added_files=$(git diff --name-only --diff-filter=A ${BASE}.. 2>&1)
+if echo $added_files | grep -q chirp.drivers && ! echo $added_files | grep -q tests.images; then
+    fail All new drivers should include a test image
+fi
+
+existing_drivers=$(git ls-tree --name-only $BASE chirp/drivers/)
+limit=20
+for nf in $added_files; do
+    for of in $existing_drivers; do
+        change=$(wdiff -s $of $nf | grep $of | sed -r 's/.* ([0-9]+)% changed/\1/')
+        if [ "$change" -lt "$limit" ]; then
+            fail "New file $nf shares at least $((100 - $change))% with $of!"
+        fi
+    done
+done
 
 exit $RETCODE
