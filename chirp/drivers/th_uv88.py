@@ -34,13 +34,8 @@ MEM_FORMAT = """
 struct chns {
   ul32 rxfreq;
   ul32 txfreq;
-  ul16 scramble:4
-       rxtone:12; //decode:12
-  ul16 decodeDSCI:1
-       encodeDSCI:1
-       unk1:1
-       unk2:1
-       txtone:12; //encode:12
+  ul16 rxtone; //decode:12
+  ul16 txtone; //decode:12
   u8   power:2
        wide:2
        b_lock:2
@@ -53,7 +48,12 @@ struct chns {
        pttid:2
        unk7:1
        step:3;               // not required
-  u8   name[6];
+  u8   unused_9;
+  u8   unused_9;
+  u8   unused_9;
+  u8   unused_9;
+  u8   unused_9;
+  u8   unused_9;
 };
 
 struct vfo {
@@ -207,7 +207,7 @@ struct {
 
 MEM_SIZE = 0x22A0
 BLOCK_SIZE = 0x20
-STIMEOUT = 2
+STIMEOUT = 5
 BAUDRATE = 57600
 
 # Channel power: 3 levels
@@ -529,7 +529,7 @@ class THUV88Radio(chirp_common.CloneModeRadio):
         rf.valid_dtcs_codes = chirp_common.ALL_DTCS_CODES  # this is just to
         # get it working, not sure this is right
         rf.valid_bands = self.VALID_BANDS
-        rf.memory_bounds = (1, 199)
+        rf.memory_bounds = (1, 190)
         rf.valid_skips = ["", "S"]
         return rf
 
@@ -596,14 +596,14 @@ class THUV88Radio(chirp_common.CloneModeRadio):
 
         # Determine if channel is empty
 
-        if _do_map(number, 2, self._memobj.chan_avail.bitmap) == 0:
-            mem.empty = True
-            return mem
+        # if _do_map(number, 2, self._memobj.chan_avail.bitmap) == 0:
+        #     mem.empty = True
+        #     return mem
 
-        if _do_map(mem.number, 2, self._memobj.chan_skip.bitmap) > 0:
-            mem.skip = ""
-        else:
-            mem.skip = "S"
+        # if _do_map(mem.number, 2, self._memobj.chan_skip.bitmap) > 0:
+        #     mem.skip = ""
+        # else:
+        #     mem.skip = "S"
 
         return self._get_memory(mem, _mem, _name)
 
@@ -631,12 +631,12 @@ class THUV88Radio(chirp_common.CloneModeRadio):
             mem.offset = abs(int(_mem.rxfreq) - int(_mem.txfreq)) * 10
 
         mem.name = ""
-        for i in range(6):   # 0 - 6
-            mem.name += chr(_mem.name[i])
-        for i in range(10):
-            mem.name += chr(_name.extra_name[i])
+        # for i in range(6):   # 0 - 6
+        #     mem.name += chr(_mem.name[i])
+        # for i in range(10):
+        #     mem.name += chr(_name.extra_name[i])
 
-        mem.name = mem.name.rstrip()    # remove trailing spaces
+        # mem.name = mem.name.rstrip()    # remove trailing spaces
 
         # ########## TONE ##########
 
@@ -660,8 +660,8 @@ class THUV88Radio(chirp_common.CloneModeRadio):
             rxmode = "DTCS"
             mem.rx_dtcs = int(format(int(_mem.rxtone), 'o'))
 
-        mem.dtcs_polarity = ("N", "R")[_mem.encodeDSCI] + (
-                             "N", "R")[_mem.decodeDSCI]
+        # mem.dtcs_polarity = ("N", "R")[_mem.encodeDSCI] + (
+        #                      "N", "R")[_mem.decodeDSCI]
 
         mem.tmode = ""
         if txmode == "Tone" and not rxmode:
@@ -689,14 +689,14 @@ class THUV88Radio(chirp_common.CloneModeRadio):
                                                   LIST_STEPS[_mem.step]))
         mem.extra.append(step)
 
-        scramble_value = _mem.scramble
-        if scramble_value >= 8:     # Looks like OFF is 0x0f ** CONFIRM
-            scramble_value = 0
-        scramble = RadioSetting("scramble", "Scramble",
-                                RadioSettingValueList(SCRAMBLE_LIST,
-                                                      SCRAMBLE_LIST[
-                                                          scramble_value]))
-        mem.extra.append(scramble)
+        # scramble_value = _mem.scramble
+        # if scramble_value >= 8:     # Looks like OFF is 0x0f ** CONFIRM
+        #     scramble_value = 0
+        # scramble = RadioSetting("scramble", "Scramble",
+        #                         RadioSettingValueList(SCRAMBLE_LIST,
+        #                                               SCRAMBLE_LIST[
+        #                                                   scramble_value]))
+        #mem.extra.append(scramble)
 
         optsig = RadioSetting("signal", "Optional signaling",
                               RadioSettingValueList(
@@ -1103,6 +1103,17 @@ class THUV88Radio(chirp_common.CloneModeRadio):
 class RT85(THUV88Radio):
     VENDOR = "Retevis"
     MODEL = "RT85"
+
+@directory.register
+class RT45P(THUV88Radio):
+    VENDOR = "Retevis"
+    MODEL = "RT45P"
+
+    _magic0 = b"\xFE\xFE\xEE\xEF\xE0" + b"UV87" + b"\xFD"
+    _magic2 = b"\xFE\xFE\xEE\xEF\xE2" + b"UV87" + b"\xFD"
+    _magic3 = b"\xFE\xFE\xEE\xEF\xE3" + b"UV87" + b"\xFD"
+    _magic5 = b"\xFE\xFE\xEE\xEF\xE5" + b"UV87" + b"\xFD"
+    _fingerprint = b"\xFE\xFE\xEF\xEE\xE1" + b"UV87"
 
 
 @directory.register
