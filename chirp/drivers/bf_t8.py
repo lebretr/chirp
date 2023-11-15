@@ -325,7 +325,7 @@ class BFT8Radio(chirp_common.CloneModeRadio):
     _mem_params = (_upper,  # number of channels
                    _upper   # number of names
                    )
-    _frs = _gmrs = _murs = _pmr = False
+    _frs = _gmrs = _murs = _pmr = _pmr_Unbridle = False
 
     _ranges = [
                (0x0000, 0x0B60),
@@ -512,6 +512,21 @@ class BFT8Radio(chirp_common.CloneModeRadio):
                     immutable = ["empty", "freq", "duplex", "offset", "mode"]
                 else:
                     immutable = ["empty", "freq", "duplex", "offset"]
+        elif self._pmr_Unbridle:
+            if mem.freq in PMR_FREQS:
+                if mem.number >= 1 and mem.number <= 16:
+                    PMR_FREQ = PMR_FREQS[mem.number - 1]
+                    mem.freq = PMR_FREQ
+                    immutable = ["empty", "freq", "duplex", "offset", "mode",
+                             "power"]
+                else:
+                    immutable = ["empty", "duplex", "offset", "mode"]
+                mem.duplex = ''
+                mem.offset = 0
+                mem.mode = "NFM"
+                # mem.power = self.POWER_LEVELS[1]
+                #immutable = ["empty", "freq", "duplex", "offset", "mode",
+                #             "power"]
         elif self._pmr:
             if mem.freq in PMR_FREQS:
                 if mem.number >= 1 and mem.number <= 16:
@@ -934,12 +949,25 @@ class RetevisRB27V(RetevisRB27B):
 class RetevisRB627B(RetevisRB27B):
     VENDOR = "Retevis"
     MODEL = "RB627B"
-    POWER_LEVELS = [chirp_common.PowerLevel("High", watts=0.50),
+    POWER_LEVELS = [chirp_common.PowerLevel("High", watts=2.00),
                     chirp_common.PowerLevel("Low", watts=0.50)]
 
-    _upper = 16
+    _upper = 48
+    _pmr_Unbridle = True
     _pmr = True
     _frs = _gmrs = _murs = False
+
+
+@directory.register
+class RetevisRB627B_Unbridle(RetevisRB27B):
+    VENDOR = "Retevis"
+    MODEL = "RB627B_Unbridle"
+    POWER_LEVELS = [chirp_common.PowerLevel("High", watts=2.00),
+                    chirp_common.PowerLevel("Low", watts=0.50)]
+
+    _upper = 32
+    _pmr_Unbridle = True
+    _pmr = _frs = _gmrs = _murs = False
 
 
 @directory.register
