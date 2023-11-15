@@ -77,7 +77,7 @@ struct {
   u8 unknown0x0194;
   u8 menuen:1,           // menu enable
      absel:1,            // a/b select
-     unknown:2
+     unknown:2,
      keymshort:4;        // m key short press
   u8 unknown:4,
      dtmfst:1,           // dtmf sidetone
@@ -170,7 +170,7 @@ SQL_LIST = ["%s" % x for x in range(0, 10)]
 SCANM_LIST = ["CO", "TO"]
 TOT_LIST = ["OFF"] + ["%s seconds" % x for x in range(10, 130, 10)]
 _STEP_LIST = [2.5, 5., 6.25, 10., 12.5, 25.]
-STEP_LIST = ["{} KHz".format(x) for x in _STEP_LIST]
+STEP_LIST = ["{} kHz".format(x) for x in _STEP_LIST]
 MONITOR_LIST = ["CTC/DCS", "DTMF", "CTC/DCS and DTMF", "CTC/DCS or DTMF"]
 VFOMR_LIST = ["MR", "VFO"]
 MRCHA_LIST = ["MR CHA", "Freq. MR"]
@@ -199,7 +199,7 @@ PFKEYLONG_LIST = ["OFF",
                   "VFO/MR",
                   "DTMF",
                   "CALL",
-                  "Transmit 1750Hz",
+                  "Transmit 1750 Hz",
                   "A/B",
                   "Talk Around",
                   "Reverse"
@@ -217,7 +217,7 @@ PFKEYSHORT_LIST = ["OFF",
                    "VFO/MR",
                    "DTMF",
                    "CALL",
-                   "Transmit 1750Hz",
+                   "Transmit 1750 Hz",
                    "A/B",
                    "Talk Around",
                    "Reverse"
@@ -225,7 +225,7 @@ PFKEYSHORT_LIST = ["OFF",
 
 MODES = ["NFM", "FM"]
 WTFTONES = tuple(float(x) for x in range(56, 64))
-TONES = WTFTONES + chirp_common.TONES
+TONES = tuple(sorted(WTFTONES + chirp_common.TONES))
 DTCS_CODES = tuple(sorted((17, 50, 645) + chirp_common.DTCS_CODES))
 TMODES = ["", "Tone", "DTCS", "DTCS"]
 
@@ -419,6 +419,7 @@ class LeixenVV898Radio(chirp_common.CloneModeRadio):
         rf.valid_tuning_steps = _STEP_LIST
         rf.valid_bands = [(136000000, 174000000),
                           (400000000, 470000000)]
+        rf.valid_tones = TONES
         rf.valid_dtcs_codes = DTCS_CODES
         rf.memory_bounds = (1, 199)
         return rf
@@ -473,7 +474,7 @@ class LeixenVV898Radio(chirp_common.CloneModeRadio):
     def _is_txinh(self, _mem):
         raw_tx = ""
         for i in range(0, 4):
-            raw_tx += _mem.tx_freq[i].get_raw()
+            raw_tx += _mem.tx_freq[i].get_raw(asbytes=False)
         return raw_tx == b"\xFF\xFF\xFF\xFF"
 
     def _get_memobjs(self, number):
@@ -487,7 +488,7 @@ class LeixenVV898Radio(chirp_common.CloneModeRadio):
         mem = chirp_common.Memory()
         mem.number = number
 
-        if _mem.get_raw()[:4] == "\xFF\xFF\xFF\xFF":
+        if _mem.get_raw(asbytes=False)[:4] == "\xFF\xFF\xFF\xFF":
             mem.empty = True
             return mem
 
@@ -589,7 +590,7 @@ class LeixenVV898Radio(chirp_common.CloneModeRadio):
         if mem.empty:
             _mem.set_raw(b"\xFF" * 16)
             return
-        elif _mem.get_raw() == (b"\xFF" * 16):
+        elif _mem.get_raw(asbytes=False) == (b"\xFF" * 16):
             _mem.set_raw(b"\xFF" * 8 + b"\xFF\x00\xFF\x00\xFF\xFE\xF0\xFC")
 
         _mem.rx_freq = mem.freq / 10
@@ -621,12 +622,8 @@ class LeixenVV898Radio(chirp_common.CloneModeRadio):
             aliasop = None
         if mem.name:
             _mem.aliasop = False
-            if aliasop and not aliasop.changed():
-                aliasop.value = "Name"
         else:
             _mem.aliasop = True
-            if aliasop and not aliasop.changed():
-                aliasop.value = "Frequency"
 
         for setting in mem.extra:
             setattr(_mem, setting.get_name(), setting.value)

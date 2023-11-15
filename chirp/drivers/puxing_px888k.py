@@ -174,7 +174,7 @@ struct {
 
         // 5
         u8 allow_keypad:1,
-           relay_without_disable_tail:1
+           relay_without_disable_tail:1,
            _unknown_0C65:1,
            call_channel_active:1,
            vox_gain:4;
@@ -242,8 +242,8 @@ struct {
         // 1
         u8 _unknown_0C91_1:3,
            channel_stepping:1,
-           unknown_0C91_2:1
-           receive_range:2
+           unknown_0C91_2:1,
+           receive_range:2,
            unknown_0C91_3:1;
 
         // 2-3
@@ -291,7 +291,7 @@ struct {
            compander:1,
            txpower:1,
            modulation_width:1,
-           txrx_reverse:1
+           txrx_reverse:1,
            bcl:2;
 
         // D
@@ -495,7 +495,7 @@ SCRAMBLER_MODES = OFF_INT[0:9]
 PTT_ID_EDGES = ["Off", "BOT", "EOT", "Both"]
 OPTSIGN_MODES = ["None", "DTMF", "5-Tone", "MSK"]
 
-VFO_STRIDE = ['5kHz', '6.25kHz', '10kHz', '12.5kHz', '25kHz']
+VFO_STRIDE = ['5 kHz', '6.25 kHz', '10 kHz', '12.5 kHz', '25 kHz']
 AB = ['A', 'B']
 WATCH_MODES = ['Single watch', 'Dual watch']
 AB_MODES = ['VFO', 'Memory index', 'Memory name', 'Memory frequency']
@@ -505,7 +505,7 @@ WAIT_TIMES = [("0.3s", 6), ("0.5s", 10)] +\
 
 BUTTON_MODES = ["Send call list data",
                 "Emergency alarm",
-                "Send 1750Hz signal",
+                "Send 1750 Hz signal",
                 "Open squelch"]
 BOOT_MESSAGE_TYPES = ["Off", "Battery voltage", "Custom message"]
 TALKBACK = ['Off', 'Chinese', 'English']
@@ -549,8 +549,8 @@ FIVE_TONE_ALERT_TRANSPOND = list(zip(['Off', 'Alert tone',
                                       'Transpond', 'Transpond-ID code'],
                                      [255] + list(range(1, 4))))
 
-BFM_BANDS = ['87.5-108MHz', '76.0-91.0MHz', '76.0-108.0MHz', '65.0-76.0MHz']
-BFM_STRIDE = ['100kHz', '50kHz']
+BFM_BANDS = ['87.5-108 MHz', '76.0-91.0 MHz', '76.0-108.0 MHz', '65.0-76.0 MHz']
+BFM_STRIDE = ['100 kHz', '50 kHz']
 
 
 def piperead(pipe, amount):

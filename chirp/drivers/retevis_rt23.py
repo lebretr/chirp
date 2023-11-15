@@ -384,7 +384,7 @@ class RT23Radio(chirp_common.CloneModeRadio):
                                 "->Tone", "->DTCS", "DTCS->", "DTCS->DTCS"]
         rf.valid_power_levels = RT23_POWER_LEVELS
         rf.valid_duplexes = ["", "-", "+", "split", "off"]
-        rf.valid_modes = ["FM", "NFM"]  # 25 KHz, 12.5 KHz.
+        rf.valid_modes = ["FM", "NFM"]  # 25 kHz, 12.5 kHz.
         rf.valid_dtcs_codes = RT23_DTCS
         rf.memory_bounds = (1, 128)
         rf.valid_tuning_steps = _STEP_LIST
@@ -430,7 +430,7 @@ class RT23Radio(chirp_common.CloneModeRadio):
     def decode_tone(self, val):
         """Parse the tone data to decode from mem, it returns:
         Mode (''|DTCS|Tone), Value (None|###), Polarity (None,N,R)"""
-        if val.get_raw() == "\xFF\xFF":
+        if val.get_raw(asbytes=False) == "\xFF\xFF":
             return '', None, None
 
         val = int(val)
@@ -476,23 +476,23 @@ class RT23Radio(chirp_common.CloneModeRadio):
 
         mem.freq = int(_mem.rxfreq) * 10
 
-        # We'll consider any blank (i.e. 0MHz frequency) to be empty
+        # We'll consider any blank (i.e. 0 MHz frequency) to be empty
         if mem.freq == 0:
             mem.empty = True
             return mem
 
-        if _mem.rxfreq.get_raw() == "\xFF\xFF\xFF\xFF":
+        if _mem.rxfreq.get_raw(asbytes=False) == "\xFF\xFF\xFF\xFF":
             mem.empty = True
             return mem
 
-        if _mem.get_raw() == ("\xFF" * 16):
+        if _mem.get_raw(asbytes=False) == ("\xFF" * 16):
             LOG.debug("Initializing empty memory")
             _mem.set_raw("\x00" * 16)
 
         # Freq and offset
         mem.freq = int(_mem.rxfreq) * 10
         # tx freq can be blank
-        if _mem.get_raw()[4] == "\xFF":
+        if _mem.get_raw(asbytes=False)[4] == "\xFF":
             # TX freq not set
             mem.offset = 0
             mem.duplex = "off"
@@ -568,7 +568,7 @@ class RT23Radio(chirp_common.CloneModeRadio):
         else:
             _usd |= bitpos
 
-        if _mem.get_raw() == ("\xFF" * 16):
+        if _mem.get_raw(asbytes=False) == ("\xFF" * 16):
             LOG.debug("Initializing empty memory")
             _mem.set_raw("\x00" * 16)
             _scn |= bitpos

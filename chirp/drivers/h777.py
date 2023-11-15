@@ -322,7 +322,7 @@ class H777Radio(chirp_common.CloneModeRadio):
     def get_features(self):
         rf = chirp_common.RadioFeatures()
         rf.has_settings = True
-        rf.valid_modes = ["NFM", "FM"]  # 12.5 KHz, 25 kHz.
+        rf.valid_modes = ["NFM", "FM"]  # 12.5 kHz, 25 kHz.
         rf.valid_skips = ["", "S"]
         rf.valid_tmodes = ["", "Tone", "TSQL", "DTCS", "Cross"]
         rf.valid_duplexes = ["", "-", "+", "split", "off"]
@@ -394,17 +394,17 @@ class H777Radio(chirp_common.CloneModeRadio):
         mem.number = number
         mem.freq = int(_mem.rxfreq) * 10
 
-        # We'll consider any blank (i.e. 0MHz frequency) to be empty
+        # We'll consider any blank (i.e. 0 MHz frequency) to be empty
         if mem.freq == 0:
             mem.empty = True
             return mem
 
-        if _mem.rxfreq.get_raw() == "\xFF\xFF\xFF\xFF":
+        if _mem.rxfreq.get_raw(asbytes=False) == "\xFF\xFF\xFF\xFF":
             mem.freq = 0
             mem.empty = True
             return mem
 
-        if _mem.txfreq.get_raw() == "\xFF\xFF\xFF\xFF":
+        if _mem.txfreq.get_raw(asbytes=False) == "\xFF\xFF\xFF\xFF":
             mem.duplex = "off"
             mem.offset = 0
         elif int(_mem.rxfreq) == int(_mem.txfreq):

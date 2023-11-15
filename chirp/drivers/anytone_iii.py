@@ -131,7 +131,7 @@ struct memory {
        txdcsextra:1,        // use with txcode for index of tx DCS to use
        rxdcsinv:1,          // inverse DCS rx polarity
        txdcsinv:1,          // inverse DCS tx polarity
-       channel_width:2,     // [25kHz, 20kHz, 12.5kHz]
+       channel_width:2,     // [25 kHz, 20 kHz, 12.5 kHz]
        rev:1,               // reverse the tx and rx frequencies & tones
        txoff:1;             // prevent tx
     u8 talkaround:1,        // Use the rx freq & tone when transmitting
@@ -154,7 +154,7 @@ struct memory {
        pttid:2,             // [Off, Begin, End, Begin&End]
        unknown6:2,
        bclo:2;              // [Off, Repeater, Busy]
-    u8 unknown7:6
+    u8 unknown7:6,
        band:2;              // [2m, 1-1/4m, 350+ MHz, 70cm]
     u8 unknown8:5,
        sql_mode:3;          // [Carrier, CTCSS/DCS Tones, Opt Sig Only,
@@ -238,7 +238,7 @@ struct {
      clk_shift:1,           // CLK Shift: 0=off 1=on
      ext_spk_on:1,          // Enable the external speaker
      alt_key_mode:1,        // Use Alt Keypad Mode: 0=off 1=on
-     beep_on:1              // Enable beep
+     beep_on:1,             // Enable beep
      no_tone_elim_tail:1,   // Elim squelch tail when no CTCSS/DCS signaling
      sql_key_mode:1;        // SQL Key Function: [Momentary, Toggle]
   u8 unknown16:5,
