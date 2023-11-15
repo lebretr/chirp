@@ -919,8 +919,10 @@ class RetevisRB627B(RetevisRB27B):
     MODEL = "RB627B"
     POWER_LEVELS = [chirp_common.PowerLevel("High", watts=2.00),
                     chirp_common.PowerLevel("Low", watts=0.50)]
+    VALID_BANDS = [(136000000, 174000000),
+                   (400000000, 520000000)]
 
-    _upper = 48
+    _upper = 51
     _pmr_Unbridle = True
     _pmr = True
     _frs = _gmrs = _murs = False
