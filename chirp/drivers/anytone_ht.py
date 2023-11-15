@@ -438,6 +438,7 @@ class AnyToneTERMN8RRadio(chirp_common.CloneModeRadio,
         rf.valid_tmodes = ['', 'Tone', 'TSQL', 'DTCS', 'Cross']
         rf.valid_cross_modes = ["Tone->Tone", "Tone->DTCS", "DTCS->Tone",
                                 "->Tone", "->DTCS", "DTCS->", "DTCS->DTCS"]
+        rf.valid_tones = TONES
         rf.valid_dtcs_codes = chirp_common.ALL_DTCS_CODES
         rf.valid_bands = [(136000000, 174000000),
                           (400000000, 520000000)]
@@ -556,7 +557,7 @@ class AnyToneTERMN8RRadio(chirp_common.CloneModeRadio,
             return
         _usd &= ~bitpos
 
-        if _mem.get_raw() == ("\xFF" * 32):
+        if _mem.get_raw(asbytes=False) == ("\xFF" * 32):
             LOG.debug("Initializing empty memory")
             _mem.set_raw("\x00" * 32)
             _mem.squelch = 3

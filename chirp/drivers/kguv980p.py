@@ -556,7 +556,7 @@ _MEM_FORMAT = """
         u8      unknown3:6,
                 Unknown4_shft_dir:2;
         u8      unknown5:3,
-                compander:1
+                compander:1,
                 scrambler:4;
     } memory[1000];
 
@@ -774,7 +774,7 @@ class KG980PRadio(chirp_common.CloneModeRadio,
     #
     # The ID record returned by the radio also includes the
     # current frequency range
-    # as 4 bytes big-endian in 10Hz increments
+    # as 4 bytes big-endian in 10 Hz increments
     #
     # Offset
     #  0:10     Model, zero padded
@@ -2472,7 +2472,7 @@ class KG980PRadio(chirp_common.CloneModeRadio,
         # FM RADIO PRESETS
 
         # memory stores raw integer value like 7600
-        # radio will divide 7600 by 100 and interpret correctly at 76.0MHz
+        # radio will divide 7600 by 100 and interpret correctly at 76.0 MHz
 
         for i in range(1, 21):
             # chan = str(i)

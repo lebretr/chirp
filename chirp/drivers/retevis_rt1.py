@@ -352,7 +352,7 @@ class RT1Radio(chirp_common.CloneModeRadio):
                                 "->Tone", "->DTCS", "DTCS->", "DTCS->DTCS"]
         rf.valid_power_levels = RT1_POWER_LEVELS
         rf.valid_duplexes = ["", "-", "+", "split", "off"]
-        rf.valid_modes = ["NFM", "FM"]  # 12.5 KHz, 25 kHz.
+        rf.valid_modes = ["NFM", "FM"]  # 12.5 kHz, 25 kHz.
         rf.valid_dtcs_codes = RT1_DTCS
         rf.memory_bounds = (1, 16)
         rf.valid_tuning_steps = [2.5, 5., 6.25, 10., 12.5, 25.]
@@ -381,7 +381,7 @@ class RT1Radio(chirp_common.CloneModeRadio):
     def decode_tone(self, val):
         """Parse the tone data to decode from mem, it returns:
         Mode (''|DTCS|Tone), Value (None|###), Polarity (None,N,R)"""
-        if val.get_raw() == "\xFF\xFF":
+        if val.get_raw(asbytes=False) == "\xFF\xFF":
             return '', None, None
 
         val = int(val)
@@ -421,12 +421,12 @@ class RT1Radio(chirp_common.CloneModeRadio):
         mem.number = number
         mem.freq = int(_mem.rxfreq) * 10
 
-        # We'll consider any blank (i.e. 0MHz frequency) to be empty
+        # We'll consider any blank (i.e. 0 MHz frequency) to be empty
         if mem.freq == 0:
             mem.empty = True
             return mem
 
-        if _mem.rxfreq.get_raw() == "\xFF\xFF\xFF\xFF":
+        if _mem.rxfreq.get_raw(asbytes=False) == "\xFF\xFF\xFF\xFF":
             mem.freq = 0
             mem.empty = True
             return mem

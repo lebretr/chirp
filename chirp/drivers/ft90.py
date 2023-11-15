@@ -135,7 +135,7 @@ struct mem_struct {
        step:3;
     u8 artsmode:2,
        unknown2:1,
-       isUhf2:1
+       isUhf2:1,
        power:2,
        shift:2;
     u8 skip:1,
@@ -409,7 +409,7 @@ struct  {
         else:
             mem.power = FT90_POWER_LEVELS_VHF[_mem.power]
 
-        # radio has a known bug with 5khz step and squelch
+        # radio has a known bug with 5 kHz step and squelch
         if _mem.step == 0 or _mem.step > len(FT90_STEPS)-1:
             _mem.step = 2
         mem.tuning_step = FT90_STEPS[_mem.step]
@@ -436,7 +436,7 @@ struct  {
             _mem = self._memobj.memory[mem.number - 1]
             self._set_chan_enable(mem.number, not mem.empty)
         _mem.skip = mem.skip == "S"
-        # radio has a known bug with 5khz step and dead squelch
+        # radio has a known bug with 5 kHz step and dead squelch
         if not mem.tuning_step or mem.tuning_step == FT90_STEPS[0]:
             _mem.step = 2
         else:

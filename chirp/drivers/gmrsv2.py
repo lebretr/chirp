@@ -286,7 +286,7 @@ class GMRSV2base(baofeng_common.BaofengCommonHT):
          sftd:2,
          unused5:4;
       u8 unknown4;
-      u8 unused3:1
+      u8 unused3:1,
          step:3,
          unused4:4;
       u8 txpower:1,
@@ -385,7 +385,7 @@ class GMRSV2base(baofeng_common.BaofengCommonHT):
         mem = chirp_common.Memory()
         mem.number = number
 
-        if _mem.get_raw()[0] == "\xff":
+        if _mem.get_raw(asbytes=False)[0] == "\xff":
             mem.empty = True
             return mem
 
@@ -505,7 +505,7 @@ class GMRSV2base(baofeng_common.BaofengCommonHT):
                     mem.power = self.POWER_LEVELS[1]
                     immutable = ["duplex", "offset", "mode", "power"]
                 elif mem.freq in bandplan_na.GMRS_HIRPT:
-                    # GMRS repeater channels, always either simplex or +5MHz
+                    # GMRS repeater channels, always either simplex or +5 MHz
                     if mem.duplex == '':
                         mem.offset = 0
                     if mem.duplex == '+':
@@ -1075,7 +1075,7 @@ class GMRSV2(GMRSV2base):
         msgs = super().validate_memory(mem)
 
         _msg_duplex = 'Duplex must be "off" for this frequency'
-        _msg_offset = 'Only simplex or +5MHz offset allowed on GMRS'
+        _msg_offset = 'Only simplex or +5 MHz offset allowed on GMRS'
 
         if mem.freq not in bandplan_na.ALL_GMRS_FREQS:
             if mem.duplex != "off":
@@ -1105,7 +1105,7 @@ class MURSV2(GMRSV2base):
         msgs = super().validate_memory(mem)
 
         _msg_duplex = 'Duplex must be "off" for this frequency'
-        _msg_offset = 'Only simplex or +5MHz offset allowed on GMRS'
+        _msg_offset = 'Only simplex or +5 MHz offset allowed on GMRS'
 
         print('frequency')
         print(mem.freq)

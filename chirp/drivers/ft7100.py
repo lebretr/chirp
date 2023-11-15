@@ -178,7 +178,7 @@ struct mem {
   u8   dtcs_index;
   u8   is_mode_am:1,
        unknown71:2,
-       is_packet96:1
+       is_packet96:1,
        unknown72:2,
        power_index:2;
   u8   unknown81:2,
@@ -663,7 +663,7 @@ class FT7100Radio(YaesuCloneModeRadio):
         if _mem.is_split:
             mem.offset = int(_mem.freq_tx_Hz)
         else:
-            mem.offset = int(_mem.offset_10khz)*10000   # 10kHz to Hz
+            mem.offset = int(_mem.offset_10khz)*10000   # 10 kHz to Hz
 
         if _mem.is_mode_am:
             mem.mode = "AM"
@@ -771,7 +771,8 @@ class FT7100Radio(YaesuCloneModeRadio):
             else:
                 setattr(_mem, setting.get_name(), setting.value)
 
-        LOG.debug("encoded mem\n%s\n", (util.hexprint(_mem.get_raw()[0:25])))
+        LOG.debug("encoded mem\n%s\n",
+                  (util.hexprint(_mem.get_raw(asbytes=False)[0:25])))
         LOG.debug(repr(_mem))
 
     def get_settings(self):
@@ -839,7 +840,7 @@ class FT7100Radio(YaesuCloneModeRadio):
                 RadioSettingValueList(opts, opts[_overlay.cwid])))
 
         # 6  Callsign during ARTS operation.
-        cwidw = _overlay.cwidw.get_raw()
+        cwidw = _overlay.cwidw.get_raw(asbytes=False)
         cwidw = cwidw.rstrip('\x00')
         val = RadioSettingValueString(0, 6, cwidw)
         val.set_charset(CHARSET)

@@ -318,7 +318,7 @@ LIST_WBANDA = ["Line-in", "AM", "FM"] + LIST_WBANDB
 LIST_SQL = ["Open"] + ["%s" % x for x in range(1, 10)]
 _STEP_LIST = [2.5, 5., 6.25, 8.33, 9., 10., 12.5, 15., 20., 25., 50., 100.,
               200.]
-LIST_STEP = ["Auto"] + ["{0:.2f} KHz".format(x) for x in _STEP_LIST]
+LIST_STEP = ["Auto"] + ["{0:.2f} kHz".format(x) for x in _STEP_LIST]
 LIST_SMODE = ["F-1", "F-2"]
 
 # DTMF settings lists
@@ -691,7 +691,7 @@ class VGCStyleRadio(chirp_common.CloneModeRadio,
     def decode_tone(self, val):
         """Parse the tone data to decode from mem, it returns:
         Mode (''|DTCS|Tone), Value (None|###), Polarity (None,N,R)"""
-        if val.get_raw() == "\xFF\xFF":
+        if val.get_raw(asbytes=False) == "\xFF\xFF":
             return '', None, None
 
         val = int(val)
@@ -757,7 +757,7 @@ class VGCStyleRadio(chirp_common.CloneModeRadio,
         # Freq and offset
         mem.freq = int(_mem.rxfreq) * 10
         # tx freq can be blank
-        if _mem.get_raw()[4] == "\xFF":
+        if _mem.get_raw(asbytes=False)[4] == "\xFF":
             # TX freq not set
             mem.offset = 0
             mem.duplex = "off"
