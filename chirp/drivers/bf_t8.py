@@ -326,7 +326,7 @@ class BFT8Radio(chirp_common.CloneModeRadio):
     _mem_params = (_upper,  # number of channels
                    _upper   # number of names
                    )
-    _frs = _gmrs = _murs = _pmr = False
+    _frs = _gmrs = _murs = _pmr = _pmr_Hack = False
 
     _ranges = [
                (0x0000, 0x0B60),
@@ -513,6 +513,20 @@ class BFT8Radio(chirp_common.CloneModeRadio):
                     immutable = ["empty", "freq", "duplex", "offset", "mode"]
                 else:
                     immutable = ["empty", "freq", "duplex", "offset"]
+        elif self._pmr_Hack:
+            if mem.freq in PMR_FREQS:
+                if mem.number >= 1 and mem.number <= 16:
+                    PMR_FREQ = PMR_FREQS[mem.number - 1]
+                    mem.freq = PMR_FREQ
+                    immutable = ["empty", "freq", "duplex", "offset", "mode"]
+                #else:
+                #    immutable = ["empty", "duplex", "offset", "mode"]
+                mem.duplex = ''
+                mem.offset = 0
+                mem.mode = "NFM"
+                # mem.power = self.POWER_LEVELS[1]
+                #immutable = ["empty", "freq", "duplex", "offset", "mode",
+                #             "power"]
         elif self._pmr:
             if mem.freq in PMR_FREQS:
                 if mem.number >= 1 and mem.number <= 16:
@@ -943,6 +957,22 @@ class RetevisRB627B(RetevisRB27B):
     _upper = 16
     _pmr = True
     _frs = _gmrs = _murs = False
+
+
+@directory.register
+class RetevisRB627B_Hack(RetevisRB27B):
+    VENDOR = "Retevis"
+    MODEL = "RB627B_Hack"
+    POWER_LEVELS = [chirp_common.PowerLevel("High", watts=2.00),
+                    chirp_common.PowerLevel("Low", watts=0.50)]
+    VALID_BANDS = [(136000000, 174000000),
+                   (400000000, 520000000)]
+
+
+    _upper = 55
+    _pmr = True
+    _pmr_Hack = True
+    _pmr = _frs = _gmrs = _murs = False
 
 
 @directory.register
