@@ -34,8 +34,10 @@ From a command line:
 
 ### Install the python dependencies
 
-    python3 -m pip install -r requirements.txt
     python3 -m pip install tox
+    python3 -m pip install attrdict3
+    python3 -m pip install -r requirements.txt
+
 
 ### Run chirp
 
