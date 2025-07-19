@@ -55,7 +55,7 @@ Via winget: winget install --id GitHub.cli or manually from github.com
 
 ## VS Code
 
-launch.json
+.vscode/launch.json
 ``` json
 {
     // Utilisez IntelliSense pour en savoir plus sur les attributs possibles.
